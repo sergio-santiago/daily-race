@@ -6,6 +6,10 @@ import { CalculatePointsUseCase } from '../calculate-points.use-case';
 import { GetChampionshipStandingsUseCase } from '../get-championship-standings.use-case';
 import { Driver } from '../../core/entities/driver.entity';
 import {
+  TRANSCRIPT_REPOSITORY,
+  TranscriptRepositoryPort,
+} from '../../core/ports/transcript.repository.port';
+import {
   MEET_PROVIDER,
   MeetProviderPort,
   ConferenceRecordData,
@@ -83,6 +87,7 @@ describe('ProcessRaceUseCase', () => {
     meetProvider = {
       getConferenceRecords: jest.fn(),
       getParticipants: jest.fn(),
+      getTranscriptEntries: jest.fn().mockResolvedValue([]),
     };
     calendarProvider = {
       getDailyEvent: jest.fn(),
@@ -110,6 +115,10 @@ describe('ProcessRaceUseCase', () => {
       publishChampionshipStandings: jest.fn(),
     };
 
+    const transcriptRepository: jest.Mocked<TranscriptRepositoryPort> = {
+      saveAll: jest.fn(),
+    };
+
     const module = await Test.createTestingModule({
       providers: [
         ProcessRaceUseCase,
@@ -125,6 +134,7 @@ describe('ProcessRaceUseCase', () => {
         { provide: DRIVER_REPOSITORY, useValue: driverRepository },
         { provide: STARTING_GRID_REPOSITORY, useValue: gridRepository },
         { provide: NOTIFICATION_PORT, useValue: notification },
+        { provide: TRANSCRIPT_REPOSITORY, useValue: transcriptRepository },
         {
           provide: ConfigService,
           useValue: { get: () => 'wye-iwfu-jch' },

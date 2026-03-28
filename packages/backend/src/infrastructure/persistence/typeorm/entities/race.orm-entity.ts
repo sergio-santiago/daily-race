@@ -7,6 +7,7 @@ import {
   Index,
 } from 'typeorm';
 import { StartingGridEntryOrmEntity } from './starting-grid-entry.orm-entity';
+import { TranscriptEntryOrmEntity } from './transcript-entry.orm-entity';
 
 @Entity('races')
 export class RaceOrmEntity {
@@ -40,4 +41,9 @@ export class RaceOrmEntity {
     cascade: true,
   })
   startingGrid: StartingGridEntryOrmEntity[];
+
+  @OneToMany(() => TranscriptEntryOrmEntity, (entry) => entry.race, {
+    cascade: true,
+  })
+  transcriptEntries: TranscriptEntryOrmEntity[];
 }
