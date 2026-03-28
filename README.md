@@ -65,6 +65,7 @@ El backend incluye un **scheduler (cron)** que automatiza el procesamiento de la
   3. Persiste los datos en PostgreSQL (drivers, race, starting grid)
   4. Publica el ranking en **#race-day** (Discord)
   5. Publica la clasificacion general actualizada en **#championship** (Discord)
+- Solo procesa reuniones que terminaron **despues** de la hora programada (si alguien entra y sale antes del green light, se ignora)
 - Si la daily ya fue procesada, no la reprocesa (idempotente)
 
 **Para que funcione en automatico, el backend debe estar corriendo continuamente** (en un servidor, VPS, o Cloud Run). En desarrollo local con `make dev`, el scheduler tambien esta activo.

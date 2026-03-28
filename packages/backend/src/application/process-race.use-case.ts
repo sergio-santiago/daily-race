@@ -108,7 +108,11 @@ export class ProcessRaceUseCase {
 
     const targetDate = event.scheduledStart;
     const record = records.find(
-      (r) => r.endTime && r.startTime && this.isSameDay(r.startTime, targetDate),
+      (r) =>
+        r.endTime &&
+        r.startTime &&
+        this.isSameDay(r.startTime, targetDate) &&
+        r.endTime > event.scheduledStart,
     );
 
     if (!record) {
