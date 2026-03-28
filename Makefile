@@ -31,7 +31,7 @@ logs-frontend: ## Ver logs del frontend
 # ── Backend ───────────────────────────────────────────────────
 
 backend-test: ## Ejecutar tests del backend
-	docker compose exec -w /app/packages/backend backend npx jest --passWithNoTests
+	docker compose exec -w /app/packages/backend backend npx jest --passWithNoTests --maxWorkers=1
 
 backend-test-watch: ## Ejecutar tests del backend en modo watch
 	docker compose exec -w /app/packages/backend backend npx jest --watch
