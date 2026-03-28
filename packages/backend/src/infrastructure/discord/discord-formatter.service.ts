@@ -2,12 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { Race } from '../../core/entities/race.entity';
 import { StartingGridEntry } from '../../core/entities/starting-grid-entry.entity';
 import { ChampionshipStanding } from '../../core/entities/championship-standing.entity';
-import { DEFAULT_TIMEZONE } from '@daily-race/shared';
+import { DEFAULT_TIMEZONE, WINDOW_SECONDS } from '@daily-race/shared';
 
 const SEP = '\u2500';
 const CHAMPIONSHIP_TOP_DRIVERS = 20;
 const NAME_MAX_GRID = 24;
 const NAME_MAX_CHAMPIONSHIP = 22;
+const REZAGADO_THRESHOLD = 60;
 
 export interface DiscordEmbed {
   title?: string;
@@ -81,7 +82,7 @@ export class DiscordFormatterService {
     const sections: string[] = [];
 
     if (falseStarters.length > 0) {
-      sections.push('\u26D4  SALIDA EN FALSO');
+      sections.push('\u{1F534}  SALIDA EN FALSO');
       sections.push(SEP.repeat(48));
       sections.push('');
       for (const e of falseStarters) sections.push(this.formatGridRow(e));
@@ -98,7 +99,7 @@ export class DiscordFormatterService {
 
   private buildChampionshipTable(standings: ChampionshipStanding[]): string {
     const rows = standings.map((s) => {
-      const pos = this.podiumLabel(s.rank);
+      const pos = this.championshipPosLabel(s.rank);
       const name = this.truncate(s.driver.displayName, NAME_MAX_CHAMPIONSHIP);
       const pts = s.totalPoints.toFixed(2).padStart(8);
       const races = String(s.racesAttended).padStart(2);
@@ -132,18 +133,21 @@ export class DiscordFormatterService {
     const lines: string[] = [];
 
     lines.push(
-      `\u{1F7E2}  Green Light: **${timeStr}**  \u{00B7}  **${grid.length}** pilotos`,
+      `\u{1F6A5}  Green Light: **${timeStr}**`,
+    );
+    lines.push(
+      `\u{1F3CE}\u{FE0F}  Pilotos: **${grid.length}**`,
     );
 
     if (bestDriver) {
       lines.push(
-        `\u{1F3C6}  **${bestDriver.driver.displayName}**  \u{2014}  ${bestDriver.points.toFixed(2)} pts`,
+        `\u{1F3C6}  Pole Position: **${bestDriver.driver.displayName}**  \u{2014}  ${bestDriver.points.toFixed(2)} pts`,
       );
     }
 
     if (lastDriver) {
       lines.push(
-        `\u{1F40C}  **${lastDriver.driver.displayName}**  \u{2014}  ${this.formatDiff(lastDriver.diffSeconds).trim()}`,
+        `\u{1F451}  Rey de la Ruina: **${lastDriver.driver.displayName}**  \u{2014}  ${this.formatDiff(lastDriver.diffSeconds).trim()}`,
       );
     }
 
@@ -164,12 +168,11 @@ export class DiscordFormatterService {
     const raceWord = racesCount === 1 ? 'carrera disputada' : 'carreras disputadas';
 
     const lines: string[] = [];
-    lines.push(
-      `\u{1F3CE}\u{FE0F}  **${racesCount}** ${raceWord}  \u{00B7}  \u{1F465}  **${standings.length}** pilotos`,
-    );
+    lines.push(`\u{1F3C1}  Carreras disputadas: **${racesCount}**`);
+    lines.push(`\u{1F3CE}\u{FE0F}  Pilotos: **${standings.length}**`);
     if (leader) {
       lines.push(
-        `\u{1F3C6}  Lider: **${leader.driver.displayName}**  \u{2014}  ${leader.totalPoints.toFixed(2)} pts`,
+        `\u{1F3C6}  L\u{00ED}der: **${leader.driver.displayName}**  \u{2014}  ${leader.totalPoints.toFixed(2)} pts`,
       );
     }
 
@@ -190,15 +193,16 @@ export class DiscordFormatterService {
   positionLabel(entry: StartingGridEntry): string {
     if (entry.isFalseStart) return '  \u{26D4}';
     const n = entry.position;
-    if (n === 1) return ' 1\u{1F947}';
+    if (n === 1) return ' 1\u{1F3C6}';
     if (n === 2) return ' 2\u{1F948}';
     if (n === 3) return ' 3\u{1F949}';
-    if (entry.isLastOnGrid) return String(n).padStart(2) + '\u{1F40C}';
+    if (entry.isLastOnGrid) return String(n).padStart(2) + '\u{1F451}';
+    if (entry.diffSeconds > REZAGADO_THRESHOLD) return String(n).padStart(2) + '\u{1F422}';
     return String(n).padStart(2) + '  ';
   }
 
-  podiumLabel(rank: number): string {
-    if (rank === 1) return ' 1\u{1F947}';
+  championshipPosLabel(rank: number): string {
+    if (rank === 1) return ' 1\u{1F3C6}';
     if (rank === 2) return ' 2\u{1F948}';
     if (rank === 3) return ' 3\u{1F949}';
     return String(rank).padStart(2) + '  ';
@@ -236,6 +240,7 @@ export class DiscordFormatterService {
     return date.toLocaleTimeString('es-ES', {
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit',
       timeZone: DEFAULT_TIMEZONE,
     });
   }
