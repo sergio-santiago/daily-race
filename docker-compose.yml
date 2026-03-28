@@ -1,0 +1,71 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dailyrace}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dailyrace_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-dailyrace}
+    ports:
+      - "${POSTGRES_EXTERNAL_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dailyrace}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - BACKEND_PORT=${BACKEND_PORT:-3001}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-dailyrace}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-dailyrace_dev}
+      - POSTGRES_DB=${POSTGRES_DB:-dailyrace}
+      - GOOGLE_AUTH_MODE=${GOOGLE_AUTH_MODE:-oauth}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:3001/auth/google/callback}
+      - GOOGLE_CLIENT_EMAIL=${GOOGLE_CLIENT_EMAIL:-}
+      - GOOGLE_PRIVATE_KEY=${GOOGLE_PRIVATE_KEY:-}
+      - GOOGLE_CALENDAR_ID=${GOOGLE_CALENDAR_ID:-primary}
+      - DAILY_MEETING_CODE=${DAILY_MEETING_CODE:-wye-iwfu-jch}
+      - DISCORD_WEBHOOK_RACE_DAY=${DISCORD_WEBHOOK_RACE_DAY:-}
+      - DISCORD_WEBHOOK_CHAMPIONSHIP=${DISCORD_WEBHOOK_CHAMPIONSHIP:-}
+      - TZ=${TZ:-Europe/Madrid}
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    volumes:
+      - ./packages/shared/src:/app/packages/shared/src
+      - ./packages/backend/src:/app/packages/backend/src
+      - google-tokens:/app/data
+
+  frontend:
+    build:
+      context: .
+      dockerfile: packages/frontend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - NEXT_PUBLIC_API_URL=http://localhost:${BACKEND_PORT:-3001}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./packages/shared/src:/app/packages/shared/src
+      - ./packages/frontend/src:/app/packages/frontend/src
+
+volumes:
+  pgdata:
+  google-tokens:

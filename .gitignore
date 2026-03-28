@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+**/*.d.ts
+**/*.d.ts.map
+**/src/**/*.js
+**/src/**/*.js.map
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Google API credentials
+credentials.json
+token.json
+
+# Next.js
+.next/
+out/
+
+# Testing
+coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+pgdata/
