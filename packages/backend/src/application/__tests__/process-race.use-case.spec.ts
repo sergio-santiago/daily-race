@@ -168,6 +168,24 @@ describe('ProcessRaceUseCase', () => {
     expect(result).toBeNull();
   });
 
+  it('should return null when meeting ended before green light', async () => {
+    calendarProvider.getDailyEvent.mockResolvedValue(
+      mockCalendarEvent(),
+    );
+    meetProvider.getConferenceRecords.mockResolvedValue([
+      {
+        ...mockConferenceRecord(),
+        startTime: new Date('2026-03-27T09:20:00.000Z'),
+        endTime: new Date('2026-03-27T09:25:00.000Z'),
+      },
+    ]);
+
+    const result = await useCase.execute();
+
+    expect(result).toBeNull();
+    expect(raceRepository.existsByConferenceRecordName).not.toHaveBeenCalled();
+  });
+
   it('should return null when race already processed (idempotency)', async () => {
     calendarProvider.getDailyEvent.mockResolvedValue(
       mockCalendarEvent(),
