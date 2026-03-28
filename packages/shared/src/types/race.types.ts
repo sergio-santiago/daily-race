@@ -8,7 +8,7 @@ export interface Race {
   id: string;
   conferenceRecordName: string;
   meetingCode: string;
-  greenLightTime: Date;
+  greenLight: Date;
   endTime: Date;
   status: RaceStatus;
   processedAt: Date | null;
