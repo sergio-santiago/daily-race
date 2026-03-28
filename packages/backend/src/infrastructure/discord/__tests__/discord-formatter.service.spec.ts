@@ -155,7 +155,7 @@ describe('DiscordFormatterService', () => {
       const result = formatter.formatChampionshipEmbed(standings, 5);
       const stats = result!.fields![0].value;
 
-      expect(stats).toContain('der');
+      expect(stats).toContain('L\u00edder');
       expect(stats).toContain('Leader');
       expect(stats).toContain('500.00');
       expect(stats).toContain('5');
