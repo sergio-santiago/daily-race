@@ -34,11 +34,9 @@ import { StartingGridEntry } from '../core/entities/starting-grid-entry.entity';
 import { BuildStartingGridUseCase } from './build-starting-grid.use-case';
 import { GetChampionshipStandingsUseCase } from './get-championship-standings.use-case';
 import { ConfigService } from '@nestjs/config';
-import { DAILY_MEETING_CODE } from '@daily-race/shared';
+import { DAILY_MEETING_CODE, ALL_TIME_START, ALL_TIME_END } from '@daily-race/shared';
 
 const CONFERENCE_RECORDS_LIMIT = 25;
-const ALL_TIME_START = new Date(2020, 0, 1);
-const ALL_TIME_END = new Date(2099, 11, 31);
 
 @Injectable()
 export class ProcessRaceUseCase {

@@ -1,13 +1,13 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Inject } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { GoogleAuthService } from '../infrastructure/google/google-auth.service';
+import { AUTH_PROVIDER, AuthProviderPort } from '../core/ports/auth.provider.port';
 
 @Controller('health')
 export class HealthController {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
-    private readonly googleAuth: GoogleAuthService,
+    @Inject(AUTH_PROVIDER) private readonly authProvider: AuthProviderPort,
   ) {}
 
   @Get()
@@ -23,7 +23,7 @@ export class HealthController {
       timestamp: new Date().toISOString(),
       services: {
         database: db,
-        googleAuth: this.googleAuth.isAuthenticated(),
+        googleAuth: this.authProvider.isAuthenticated(),
       },
     };
   }
