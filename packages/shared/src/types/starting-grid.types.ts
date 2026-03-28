@@ -3,7 +3,7 @@ export interface StartingGridEntry {
   raceId: string;
   driverId: string;
   startTime: Date;
-  greenLightTime: Date;
+  greenLight: Date;
   position: number;
   points: number;
   isFalseStart: boolean;
