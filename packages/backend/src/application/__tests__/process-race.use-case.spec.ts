@@ -115,6 +115,7 @@ describe('ProcessRaceUseCase', () => {
     notification = {
       publishRaceResults: jest.fn(),
       publishChampionshipStandings: jest.fn(),
+      publishTranscript: jest.fn(),
     };
 
     const transcriptRepository: jest.Mocked<TranscriptRepositoryPort> = {
