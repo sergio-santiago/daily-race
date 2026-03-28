@@ -4,6 +4,7 @@ import { ProcessRaceUseCase } from '../process-race.use-case';
 import { BuildStartingGridUseCase } from '../build-starting-grid.use-case';
 import { CalculatePointsUseCase } from '../calculate-points.use-case';
 import { GetChampionshipStandingsUseCase } from '../get-championship-standings.use-case';
+import { FindConferenceRecordService } from '../find-conference-record.service';
 import { Driver } from '../../core/entities/driver.entity';
 import {
   TRANSCRIPT_REPOSITORY,
@@ -75,6 +76,7 @@ function mockParticipants(): MeetParticipantData[] {
 }
 
 describe('ProcessRaceUseCase', () => {
+  let module: any;
   let useCase: ProcessRaceUseCase;
   let meetProvider: jest.Mocked<MeetProviderPort>;
   let calendarProvider: jest.Mocked<CalendarProviderPort>;
@@ -119,7 +121,7 @@ describe('ProcessRaceUseCase', () => {
       saveAll: jest.fn(),
     };
 
-    const module = await Test.createTestingModule({
+    module = await Test.createTestingModule({
       providers: [
         ProcessRaceUseCase,
         BuildStartingGridUseCase,
@@ -127,6 +129,12 @@ describe('ProcessRaceUseCase', () => {
         {
           provide: GetChampionshipStandingsUseCase,
           useValue: { execute: jest.fn().mockResolvedValue([]) },
+        },
+        {
+          provide: FindConferenceRecordService,
+          useValue: {
+            findForEvent: jest.fn().mockResolvedValue(mockConferenceRecord()),
+          },
         },
         { provide: MEET_PROVIDER, useValue: meetProvider },
         { provide: CALENDAR_PROVIDER, useValue: calendarProvider },
@@ -151,58 +159,20 @@ describe('ProcessRaceUseCase', () => {
     const result = await useCase.execute();
 
     expect(result).toBeNull();
-    expect(meetProvider.getConferenceRecords).not.toHaveBeenCalled();
   });
 
-  it('should return null when no conference record found', async () => {
-    calendarProvider.getDailyEvent.mockResolvedValue(
-      mockCalendarEvent(),
-    );
-    meetProvider.getConferenceRecords.mockResolvedValue([]);
+  it('should return null when findConferenceRecord returns null', async () => {
+    calendarProvider.getDailyEvent.mockResolvedValue(mockCalendarEvent());
+    const findService = module.get(FindConferenceRecordService);
+    (findService.findForEvent as jest.Mock).mockResolvedValue(null);
 
     const result = await useCase.execute();
 
     expect(result).toBeNull();
-  });
-
-  it('should return null when meeting still in progress', async () => {
-    calendarProvider.getDailyEvent.mockResolvedValue(
-      mockCalendarEvent(),
-    );
-    meetProvider.getConferenceRecords.mockResolvedValue([
-      { ...mockConferenceRecord(), endTime: null },
-    ]);
-
-    const result = await useCase.execute();
-
-    expect(result).toBeNull();
-  });
-
-  it('should return null when meeting ended before green light', async () => {
-    calendarProvider.getDailyEvent.mockResolvedValue(
-      mockCalendarEvent(),
-    );
-    meetProvider.getConferenceRecords.mockResolvedValue([
-      {
-        ...mockConferenceRecord(),
-        startTime: new Date('2026-03-27T09:20:00.000Z'),
-        endTime: new Date('2026-03-27T09:25:00.000Z'),
-      },
-    ]);
-
-    const result = await useCase.execute();
-
-    expect(result).toBeNull();
-    expect(raceRepository.existsByConferenceRecordName).not.toHaveBeenCalled();
   });
 
   it('should return null when race already processed (idempotency)', async () => {
-    calendarProvider.getDailyEvent.mockResolvedValue(
-      mockCalendarEvent(),
-    );
-    meetProvider.getConferenceRecords.mockResolvedValue([
-      mockConferenceRecord(),
-    ]);
+    calendarProvider.getDailyEvent.mockResolvedValue(mockCalendarEvent());
     raceRepository.existsByConferenceRecordName.mockResolvedValue(true);
 
     const result = await useCase.execute();

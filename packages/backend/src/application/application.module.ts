@@ -6,6 +6,7 @@ import { CalculatePointsUseCase } from './calculate-points.use-case';
 import { BuildStartingGridUseCase } from './build-starting-grid.use-case';
 import { ProcessRaceUseCase } from './process-race.use-case';
 import { GetChampionshipStandingsUseCase } from './get-championship-standings.use-case';
+import { FindConferenceRecordService } from './find-conference-record.service';
 
 @Module({
   imports: [PersistenceModule, GoogleModule, DiscordModule],
@@ -14,6 +15,7 @@ import { GetChampionshipStandingsUseCase } from './get-championship-standings.us
     BuildStartingGridUseCase,
     ProcessRaceUseCase,
     GetChampionshipStandingsUseCase,
+    FindConferenceRecordService,
   ],
   exports: [ProcessRaceUseCase, GetChampionshipStandingsUseCase],
 })

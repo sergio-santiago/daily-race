@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { ScoringParameters } from '../core/entities/scoring-parameters.entity';
 
 export interface CalculatePointsInput {
@@ -14,7 +14,11 @@ export interface CalculatePointsResult {
 
 @Injectable()
 export class CalculatePointsUseCase {
-  private readonly params = new ScoringParameters();
+  private readonly params: ScoringParameters;
+
+  constructor(@Optional() params?: ScoringParameters) {
+    this.params = params ?? new ScoringParameters();
+  }
 
   execute(input: CalculatePointsInput): CalculatePointsResult {
     const diffSeconds =
