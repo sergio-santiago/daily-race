@@ -7,6 +7,11 @@ import { ChampionshipStanding } from '../../core/entities/championship-standing.
 
 const FOOTER = 'Daily Race \u2014 Secture';
 const SEP = '\u2500';
+const DISCORD_MAX_DESCRIPTION = 4000;
+const EMBED_SEND_DELAY_MS = 500;
+const CHAMPIONSHIP_TOP_DRIVERS = 20;
+const NAME_MAX_LENGTH_GRID = 24;
+const NAME_MAX_LENGTH_CHAMPIONSHIP = 22;
 
 @Injectable()
 export class DiscordWebhookAdapter implements NotificationPort {
@@ -47,7 +52,7 @@ export class DiscordWebhookAdapter implements NotificationPort {
     for (const e of cleanGrid) sections.push(this.formatRow(e));
 
     const gridText = sections.join('\n');
-    const chunks = this.chunkText(gridText, 4000);
+    const chunks = this.chunkText(gridText, DISCORD_MAX_DESCRIPTION);
 
     // Stats
     const stats: string[] = [];
@@ -94,7 +99,7 @@ export class DiscordWebhookAdapter implements NotificationPort {
       }
 
       await this.sendWebhook({ username: 'Daily Race', embeds: [embed] });
-      if (!isLast) await this.sleep(500);
+      if (!isLast) await this.sleep(EMBED_SEND_DELAY_MS);
     }
   }
 
@@ -106,12 +111,12 @@ export class DiscordWebhookAdapter implements NotificationPort {
   ): Promise<void> {
     if (standings.length === 0) return;
 
-    const top = standings.slice(0, 20);
+    const top = standings.slice(0, CHAMPIONSHIP_TOP_DRIVERS);
     const leader = standings[0];
 
     const rows = top.map((s) => {
       const pos = this.podiumLabel(s.rank);
-      const name = this.truncate(s.driver.displayName, 22);
+      const name = this.truncate(s.driver.displayName, NAME_MAX_LENGTH_CHAMPIONSHIP);
       const pts = s.totalPoints.toFixed(2).padStart(8);
       const races = String(s.racesAttended).padStart(2);
       const avg = (s.totalPoints / s.racesAttended).toFixed(2).padStart(7);
@@ -160,7 +165,7 @@ export class DiscordWebhookAdapter implements NotificationPort {
 
   private formatRow(entry: StartingGridEntry): string {
     const pos = this.positionLabel(entry);
-    const name = this.truncate(entry.driver.displayName, 24);
+    const name = this.truncate(entry.driver.displayName, NAME_MAX_LENGTH_GRID);
     const pts = entry.points.toFixed(2).padStart(8);
     const diff = this.formatDiff(entry.diffSeconds);
 

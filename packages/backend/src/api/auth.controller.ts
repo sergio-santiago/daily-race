@@ -1,14 +1,17 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, Get, Inject, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
-import { GoogleAuthService } from '../infrastructure/google/google-auth.service';
+import { AUTH_PROVIDER, AuthProviderPort } from '../core/ports/auth.provider.port';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly googleAuth: GoogleAuthService) {}
+  constructor(
+    @Inject(AUTH_PROVIDER)
+    private readonly authProvider: AuthProviderPort,
+  ) {}
 
   @Get('google')
   startGoogleAuth(@Res() res: Response) {
-    const url = this.googleAuth.getAuthUrl();
+    const url = this.authProvider.getAuthUrl();
     res.redirect(url);
   }
 
@@ -22,7 +25,7 @@ export class AuthController {
       return;
     }
 
-    await this.googleAuth.handleCallback(code);
+    await this.authProvider.handleCallback(code);
     res.json({
       message: 'Google OAuth completed. Tokens saved.',
       authenticated: true,
@@ -32,7 +35,7 @@ export class AuthController {
   @Get('google/status')
   getStatus() {
     return {
-      authenticated: this.googleAuth.isAuthenticated(),
+      authenticated: this.authProvider.isAuthenticated(),
     };
   }
 }

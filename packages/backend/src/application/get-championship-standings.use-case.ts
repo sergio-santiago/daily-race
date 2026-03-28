@@ -8,9 +8,7 @@ import {
   StartingGridRepositoryPort,
 } from '../core/ports/starting-grid.repository.port';
 import { ChampionshipStanding } from '../core/entities/championship-standing.entity';
-
-const ALL_TIME_START = new Date(2020, 0, 1);
-const ALL_TIME_END = new Date(2099, 11, 31);
+import { ALL_TIME_START, ALL_TIME_END } from '@daily-race/shared';
 
 @Injectable()
 export class GetChampionshipStandingsUseCase {

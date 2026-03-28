@@ -6,7 +6,10 @@ import { HealthController } from './health.controller';
 import { AuthController } from './auth.controller';
 
 @Module({
-  imports: [ApplicationModule, GoogleModule],
+  imports: [
+    ApplicationModule,
+    GoogleModule, // AUTH_PROVIDER for AuthController and HealthController
+  ],
   controllers: [RaceController, HealthController, AuthController],
 })
 export class ApiModule {}

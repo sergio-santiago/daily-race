@@ -4,6 +4,7 @@ import { google } from 'googleapis';
 import { OAuth2Client, Credentials } from 'google-auth-library';
 import * as fs from 'fs';
 import * as path from 'path';
+import { AuthProviderPort } from '../../core/ports/auth.provider.port';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/meetings.space.readonly',
@@ -13,7 +14,7 @@ const SCOPES = [
 const DEFAULT_TOKENS_DIR = '/app/data';
 
 @Injectable()
-export class GoogleAuthService {
+export class GoogleAuthService implements AuthProviderPort {
   private readonly logger = new Logger(GoogleAuthService.name);
   private readonly oauth2Client: OAuth2Client;
   private readonly tokensPath: string;

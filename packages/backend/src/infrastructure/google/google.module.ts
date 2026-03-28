@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MEET_PROVIDER } from '../../core/ports/meet.provider.port';
 import { CALENDAR_PROVIDER } from '../../core/ports/calendar.provider.port';
+import { AUTH_PROVIDER } from '../../core/ports/auth.provider.port';
 import { GoogleAuthService } from './google-auth.service';
 import { GoogleMeetOAuthAdapter } from './meet-oauth.adapter';
 import { GoogleCalendarOAuthAdapter } from './calendar-oauth.adapter';
@@ -41,7 +42,8 @@ import { GoogleCalendarServiceAccountAdapter } from './calendar-service-account.
         GoogleCalendarServiceAccountAdapter,
       ],
     },
+    { provide: AUTH_PROVIDER, useExisting: GoogleAuthService },
   ],
-  exports: [MEET_PROVIDER, CALENDAR_PROVIDER, GoogleAuthService],
+  exports: [MEET_PROVIDER, CALENDAR_PROVIDER, AUTH_PROVIDER, GoogleAuthService],
 })
 export class GoogleModule {}
