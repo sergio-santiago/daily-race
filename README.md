@@ -8,17 +8,17 @@ Tras cada daily, el sistema obtiene los timestamps de entrada de cada participan
 
 El codigo usa terminologia de carreras/F1 para mantener coherencia con la tematica:
 
-| Concepto             | Termino en codigo | Emoji | Descripcion                          |
-|----------------------|-------------------|-------|--------------------------------------|
-| Daily                | Race              | \u{1F3C1}    | Cada daily es una carrera            |
-| Participante         | Driver            | \u{1F3CE}\u{FE0F}    | Cada persona es un piloto            |
-| Hora programada      | GreenLight        | \u{1F6A5}    | La luz verde / segundo 0             |
-| Ranking de entrada   | StartingGrid      | \u{1F7E2}    | Parrilla de salida                   |
-| Entrar antes de hora | FalseStart        | \u{26D4}    | Salida en falso                      |
-| Ganador (P1)         | PolePosition      | \u{1F3C6}    | Primera posicion en la parrilla      |
-| Ultimo en entrar     | LastOnGrid        | \u{1F451}    | Rey/Reina de la ruina                |
-| Entrar tarde (+60s)  | Rezagado          | \u{1F422}    | Entrada con retraso notable          |
-| Ranking acumulado    | Championship      | \u{1F3C6}    | Clasificacion general                |
+| Concepto             | Termino en codigo | Descripcion                     |
+|----------------------|-------------------|---------------------------------|
+| Daily                | Race              | Cada daily es una carrera       |
+| Participante         | Driver            | Cada persona es un piloto       |
+| Hora programada      | GreenLight        | La luz verde / segundo 0        |
+| Ranking de entrada   | StartingGrid      | Parrilla de salida              |
+| Entrar antes de hora | FalseStart        | Salida en falso                 |
+| Ganador (P1)         | PolePosition      | Primera posicion en la parrilla |
+| Ultimo en entrar     | LastOnGrid        | Rey/Reina de la ruina           |
+| Entrar tarde (+60s)  | Rezagado          | Entrada con retraso notable     |
+| Ranking acumulado    | Championship      | Clasificacion general           |
 
 ## Prerrequisitos
 
