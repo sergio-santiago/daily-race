@@ -3,6 +3,7 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import { RaceOrmEntity } from './entities/race.orm-entity';
 import { DriverOrmEntity } from './entities/driver.orm-entity';
 import { StartingGridEntryOrmEntity } from './entities/starting-grid-entry.orm-entity';
+import { TranscriptEntryOrmEntity } from './entities/transcript-entry.orm-entity';
 
 export default new DataSource({
   type: 'postgres',
@@ -12,7 +13,7 @@ export default new DataSource({
   password: process.env.POSTGRES_PASSWORD || 'dailyrace_dev',
   database: process.env.POSTGRES_DB || 'dailyrace',
   namingStrategy: new SnakeNamingStrategy(),
-  entities: [RaceOrmEntity, DriverOrmEntity, StartingGridEntryOrmEntity],
+  entities: [RaceOrmEntity, DriverOrmEntity, StartingGridEntryOrmEntity, TranscriptEntryOrmEntity],
   migrations: [
     'src/infrastructure/persistence/typeorm/migrations/*.ts',
   ],

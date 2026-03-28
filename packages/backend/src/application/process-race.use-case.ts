@@ -25,6 +25,10 @@ import {
   NOTIFICATION_PORT,
   NotificationPort,
 } from '../core/ports/notification.port';
+import {
+  TRANSCRIPT_REPOSITORY,
+  TranscriptRepositoryPort,
+} from '../core/ports/transcript.repository.port';
 import { Race, RaceStatus } from '../core/entities/race.entity';
 import { StartingGridEntry } from '../core/entities/starting-grid-entry.entity';
 import { BuildStartingGridUseCase } from './build-starting-grid.use-case';
@@ -54,6 +58,8 @@ export class ProcessRaceUseCase {
     private readonly startingGridRepository: StartingGridRepositoryPort,
     @Inject(NOTIFICATION_PORT)
     private readonly notification: NotificationPort,
+    @Inject(TRANSCRIPT_REPOSITORY)
+    private readonly transcriptRepository: TranscriptRepositoryPort,
     private readonly buildStartingGrid: BuildStartingGridUseCase,
     private readonly getChampionship: GetChampionshipStandingsUseCase,
     config: ConfigService,
@@ -89,6 +95,7 @@ export class ProcessRaceUseCase {
 
     const race = await this.buildAndSaveRace(calendarEvent, record, participants);
 
+    await this.saveTranscripts(record.name, race.id);
     await this.publishResults(race);
 
     this.logger.log(
@@ -178,6 +185,23 @@ export class ProcessRaceUseCase {
         );
       }),
     );
+  }
+
+  private async saveTranscripts(
+    conferenceRecordName: string,
+    raceId: string,
+  ): Promise<void> {
+    try {
+      const entries = await this.meetProvider.getTranscriptEntries(
+        conferenceRecordName,
+      );
+      if (entries.length > 0) {
+        await this.transcriptRepository.saveAll(raceId, entries);
+        this.logger.log(`Saved ${entries.length} transcript entries`);
+      }
+    } catch (error) {
+      this.logger.warn(`Could not save transcripts: ${error}`);
+    }
   }
 
   private async publishResults(race: Race): Promise<void> {
