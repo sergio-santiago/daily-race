@@ -8,15 +8,15 @@ Tras cada daily, el sistema obtiene los timestamps de entrada de cada participan
 
 El codigo usa terminologia de carreras/F1 para mantener coherencia con la tematica:
 
-| Concepto | Termino en codigo | Descripcion |
-|----------|-------------------|-------------|
-| Daily | Race | Cada daily es una carrera |
-| Participante | Driver | Cada persona es un piloto |
-| Hora programada | GreenLight | La luz verde / segundo 0 |
-| Ranking de entrada | StartingGrid | Parrilla de salida |
-| Entrar antes de hora | FalseStart | Salida en falso |
-| Ultimo en entrar | LastOnGrid | Ultimo en parrilla (cuenta la ruina) |
-| Ranking acumulado | Championship | Clasificacion general |
+| Concepto             | Termino en codigo | Descripcion                          |
+|----------------------|-------------------|--------------------------------------|
+| Daily                | Race              | Cada daily es una carrera            |
+| Participante         | Driver            | Cada persona es un piloto            |
+| Hora programada      | GreenLight        | La luz verde / segundo 0             |
+| Ranking de entrada   | StartingGrid      | Parrilla de salida                   |
+| Entrar antes de hora | FalseStart        | Salida en falso                      |
+| Ultimo en entrar     | LastOnGrid        | Ultimo en parrilla (cuenta la ruina) |
+| Ranking acumulado    | Championship      | Clasificacion general                |
 
 ## Prerrequisitos
 
@@ -53,16 +53,54 @@ make dev
 | `make db-shell`                     | Abre consola psql                          |
 | `make clean`                        | Elimina contenedores, volumenes e imagenes |
 
+## Funcionamiento automatico
+
+El backend incluye un **scheduler (cron)** que automatiza el procesamiento de la daily sin intervencion manual:
+
+- Se ejecuta **cada minuto, de lunes a viernes, de 9:00 a 11:00** (Europe/Madrid)
+- En cada ejecucion consulta la Google Meet API para comprobar si la daily ha terminado
+- Si detecta que la reunion ha finalizado (la sala se ha vaciado), procesa los resultados automaticamente:
+  1. Obtiene los timestamps de entrada de cada participante
+  2. Calcula los puntos segun el sistema de puntuacion
+  3. Persiste los datos en PostgreSQL (drivers, race, starting grid)
+  4. Publica el ranking en **#race-day** (Discord)
+  5. Publica la clasificacion general actualizada en **#championship** (Discord)
+- Si la daily ya fue procesada, no la reprocesa (idempotente)
+
+**Para que funcione en automatico, el backend debe estar corriendo continuamente** (en un servidor, VPS, o Cloud Run). En desarrollo local con `make dev`, el scheduler tambien esta activo.
+
 ## API
+
+### Operaciones (uso interno / administracion)
+
+| Endpoint                         | Metodo | Descripcion                                                    |
+|----------------------------------|--------|----------------------------------------------------------------|
+| `/health`                        | GET    | Health check del sistema (estado de DB y autenticacion Google) |
+| `/races/process`                 | POST   | Trigger manual: procesa la daily de hoy                        |
+| `/races/process?date=2026-03-27` | POST   | Carga historica: procesa la daily de una fecha concreta        |
+
+El endpoint `/races/process` es util para:
+- **Trigger manual**: forzar el procesamiento sin esperar al cron
+- **Carga historica**: procesar dailies pasadas (la Meet API retiene datos 30 dias)
+- **Testing**: probar el sistema sin esperar a que haya una daily real
+
+### Datos para frontend (no consumidos aun)
+
+Estos endpoints estan preparados para cuando se implemente el frontend web:
+
+| Endpoint              | Metodo | Descripcion                                                                  |
+|-----------------------|--------|------------------------------------------------------------------------------|
+| `/races/championship` | GET    | Clasificacion general acumulada (todos los drivers con puntos, races, media) |
+
+### Autenticacion OAuth
+
+Necesarios para el flujo de autenticacion con Google (modo `oauth`):
 
 | Endpoint                | Metodo | Descripcion                                        |
 |-------------------------|--------|----------------------------------------------------|
-| `/health`               | GET    | Health check                                       |
-| `/races/process?date=`  | POST   | Procesar la daily de hoy (o de una fecha concreta) |
-| `/races/championship`   | GET    | Clasificacion general acumulada                    |
-| `/auth/google`          | GET    | Iniciar flujo OAuth con Google                     |
-| `/auth/google/callback` | GET    | Callback OAuth (automatico)                        |
-| `/auth/google/status`   | GET    | Estado de autenticacion                            |
+| `/auth/google`          | GET    | Redirige a Google para iniciar el login OAuth      |
+| `/auth/google/callback` | GET    | Callback automatico donde Google devuelve el token |
+| `/auth/google/status`   | GET    | Comprueba si hay tokens validos guardados          |
 
 ## Arquitectura
 
@@ -94,8 +132,8 @@ src/
 
 Dos modos configurables via `GOOGLE_AUTH_MODE`:
 
-- **`oauth`** (desarrollo): OAuth 2.0 con cuenta personal. Requiere login manual via `/auth/google`. Solo ve reuniones del usuario autenticado.
-- **`service-account`** (produccion): Service account con domain-wide delegation. Ve todas las reuniones de la organizacion.
+- **`oauth`** (desarrollo): OAuth 2.0 con cuenta personal. Requiere login manual via `/auth/google`. Solo ve reuniones del usuario autenticado. Limitacion: la API solo devuelve datos de reuniones en las que el usuario autenticado participo.
+- **`service-account`** (produccion): Service account con domain-wide delegation. Ve todas las reuniones de la organizacion sin depender de un usuario concreto. Requiere que un admin de Google Workspace autorice la delegacion.
 
 El cambio entre modos es transparente — el `GoogleModule` inyecta el adaptador correspondiente segun la variable de entorno.
 
@@ -112,13 +150,13 @@ No asiste:      0.00
 
 Parametros ajustables en `packages/shared/src/constants/scoring.constants.ts`:
 
-| Parametro | Valor | Descripcion |
-|-----------|-------|-------------|
-| `DECAY_FACTOR` | 30 | Velocidad de decaimiento (menor = cae mas rapido) |
-| `FALSE_START_MULTIPLIER` | 20 | Severidad de la salida en falso |
-| `WINDOW_SECONDS` | 300 | Ventana de puntuacion (5 minutos) |
-| `MIN_POINTS` | 1 | Minimo por asistir |
-| `MAX_POINTS` | 100 | Maximo (entrar en el ms 0) |
+| Parametro                | Valor | Descripcion                                       |
+|--------------------------|-------|---------------------------------------------------|
+| `DECAY_FACTOR`           | 30    | Velocidad de decaimiento (menor = cae mas rapido) |
+| `FALSE_START_MULTIPLIER` | 20    | Severidad de la salida en falso                   |
+| `WINDOW_SECONDS`         | 300   | Ventana de puntuacion (5 minutos)                 |
+| `MIN_POINTS`             | 1     | Minimo por asistir                                |
+| `MAX_POINTS`             | 100   | Maximo (entrar en el ms 0)                        |
 
 ### Base de datos
 
@@ -130,10 +168,12 @@ PostgreSQL con 3 tablas (terminologia F1):
 
 ### Discord
 
-Dos canales separados:
+Dos canales separados con webhooks independientes:
 
-- **#race-day**: ranking de cada daily
-- **#championship**: clasificacion general acumulada (top 20)
+- **#race-day**: ranking de cada daily (parrilla de salida con posiciones, puntos y tiempos)
+- **#championship**: clasificacion general acumulada (top 20 con puntos totales, carreras y media)
+
+Ambos mensajes se publican automaticamente tras cada race procesada.
 
 ## Stack
 
