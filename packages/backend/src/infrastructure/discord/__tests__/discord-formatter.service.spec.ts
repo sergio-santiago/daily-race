@@ -155,7 +155,7 @@ describe('DiscordFormatterService', () => {
       const result = formatter.formatChampionshipEmbed(standings, 5);
       const stats = result!.fields![0].value;
 
-      expect(stats).toContain('Lider');
+      expect(stats).toContain('der');
       expect(stats).toContain('Leader');
       expect(stats).toContain('500.00');
       expect(stats).toContain('5');
@@ -170,8 +170,7 @@ describe('DiscordFormatterService', () => {
       ];
 
       const result = formatter.formatChampionshipEmbed(standings, 1);
-      expect(result!.fields![0].value).toContain('carrera disputada');
-      expect(result!.fields![0].value).not.toContain('carreras');
+      expect(result!.fields![0].value).toContain('Carreras disputadas: **1**');
     });
   });
 
@@ -202,12 +201,22 @@ describe('DiscordFormatterService', () => {
       const efs = makeEntry(0, 'E', -100, -5, true);
       const elast = makeEntry(5, 'F', 60, 4, false, true);
 
-      expect(formatter.positionLabel(e1)).toContain('1');
-      expect(formatter.positionLabel(e2)).toContain('2');
-      expect(formatter.positionLabel(e3)).toContain('3');
+      expect(formatter.positionLabel(e1)).toContain('\u{1F3C6}');
+      expect(formatter.positionLabel(e2)).toContain('\u{1F948}');
+      expect(formatter.positionLabel(e3)).toContain('\u{1F949}');
       expect(formatter.positionLabel(e4)).toContain('4');
       expect(formatter.positionLabel(efs)).toContain('\u{26D4}');
-      expect(formatter.positionLabel(elast)).toContain('\u{1F40C}');
+      expect(formatter.positionLabel(elast)).toContain('\u{1F451}');
+    });
+
+    it('should mark rezagados with turtle emoji', () => {
+      const rezagado = makeEntry(5, 'Slow', 10, 90);
+      expect(formatter.positionLabel(rezagado)).toContain('\u{1F422}');
+    });
+
+    it('should not mark normal entries as rezagados', () => {
+      const normal = makeEntry(5, 'Fast', 90, 3);
+      expect(formatter.positionLabel(normal)).not.toContain('\u{1F422}');
     });
 
     it('should chunk text correctly', () => {
