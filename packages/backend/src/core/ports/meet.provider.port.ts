@@ -21,15 +21,26 @@ export interface MeetTranscriptEntryData {
   endTime: Date;
 }
 
-export interface MeetProviderPort {
+export interface MeetConferenceProvider {
   getConferenceRecords(
     meetingCode: string,
     limit?: number,
   ): Promise<ConferenceRecordData[]>;
+}
+
+export interface MeetParticipantProvider {
   getParticipants(
     conferenceRecordName: string,
   ): Promise<MeetParticipantData[]>;
+}
+
+export interface MeetTranscriptProvider {
   getTranscriptEntries(
     conferenceRecordName: string,
   ): Promise<MeetTranscriptEntryData[]>;
 }
+
+export interface MeetProviderPort
+  extends MeetConferenceProvider,
+    MeetParticipantProvider,
+    MeetTranscriptProvider {}

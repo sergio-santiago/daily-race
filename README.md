@@ -185,7 +185,7 @@ Ambos mensajes se publican automaticamente tras cada race procesada.
 - **APIs**: Google Meet REST API v2, Google Calendar API v3
 - **Notificaciones**: Discord webhooks
 - **Contenedores**: Docker + Docker Compose
-- **Testing**: Jest (56 tests unitarios)
+- **Testing**: Jest (60 tests unitarios)
 
 ## Documentacion adicional
 

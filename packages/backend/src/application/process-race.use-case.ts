@@ -2,12 +2,10 @@ import { Injectable, Inject, Logger } from '@nestjs/common';
 import {
   MEET_PROVIDER,
   MeetProviderPort,
-  ConferenceRecordData,
 } from '../core/ports/meet.provider.port';
 import {
   CALENDAR_PROVIDER,
   CalendarProviderPort,
-  CalendarEventData,
 } from '../core/ports/calendar.provider.port';
 import {
   RACE_REPOSITORY,
@@ -33,10 +31,9 @@ import { Race, RaceStatus } from '../core/entities/race.entity';
 import { StartingGridEntry } from '../core/entities/starting-grid-entry.entity';
 import { BuildStartingGridUseCase } from './build-starting-grid.use-case';
 import { GetChampionshipStandingsUseCase } from './get-championship-standings.use-case';
+import { FindConferenceRecordService } from './find-conference-record.service';
 import { ConfigService } from '@nestjs/config';
 import { DAILY_MEETING_CODE, ALL_TIME_START, ALL_TIME_END } from '@daily-race/shared';
-
-const CONFERENCE_RECORDS_LIMIT = 25;
 
 @Injectable()
 export class ProcessRaceUseCase {
@@ -60,6 +57,7 @@ export class ProcessRaceUseCase {
     private readonly transcriptRepository: TranscriptRepositoryPort,
     private readonly buildStartingGrid: BuildStartingGridUseCase,
     private readonly getChampionship: GetChampionshipStandingsUseCase,
+    private readonly findConferenceRecord: FindConferenceRecordService,
     config: ConfigService,
   ) {
     this.meetingCode = config.get('DAILY_MEETING_CODE', DAILY_MEETING_CODE);
@@ -75,7 +73,7 @@ export class ProcessRaceUseCase {
       return null;
     }
 
-    const record = await this.findConferenceRecord(calendarEvent);
+    const record = await this.findConferenceRecord.findForEvent(calendarEvent);
     if (!record) return null;
 
     const alreadyProcessed =
@@ -103,40 +101,13 @@ export class ProcessRaceUseCase {
     return race;
   }
 
-  private async findConferenceRecord(
-    event: CalendarEventData,
-  ): Promise<ConferenceRecordData | null> {
-    const records = await this.meetProvider.getConferenceRecords(
-      event.meetingCode!,
-      CONFERENCE_RECORDS_LIMIT,
-    );
-
-    const targetDate = event.scheduledStart;
-    const record = records.find(
-      (r) =>
-        r.endTime &&
-        r.startTime &&
-        this.isSameDay(r.startTime, targetDate) &&
-        r.endTime > event.scheduledStart,
-    );
-
-    if (!record) {
-      this.logger.debug(
-        `No finished conference record for ${targetDate.toISOString().slice(0, 10)}`,
-      );
-    }
-
-    return record ?? null;
-  }
-
   private async buildAndSaveRace(
-    event: CalendarEventData,
-    record: ConferenceRecordData,
+    event: { meetingCode: string | null; scheduledStart: Date },
+    record: { name: string; endTime: Date | null },
     participants: Awaited<ReturnType<MeetProviderPort['getParticipants']>>,
   ): Promise<Race> {
     const greenLight = event.scheduledStart;
     const grid = this.buildStartingGrid.execute({ participants, greenLight });
-
     const resolvedGrid = await this.resolveDrivers(grid);
 
     const savedRace = await this.raceRepository.save(
@@ -198,7 +169,7 @@ export class ProcessRaceUseCase {
         this.logger.log(`Saved ${entries.length} transcript entries`);
       }
     } catch (error) {
-      this.logger.warn(`Could not save transcripts: ${error}`);
+      this.logger.error(`Failed to save transcripts for race ${raceId}: ${error}`);
     }
   }
 
@@ -213,14 +184,6 @@ export class ProcessRaceUseCase {
     await this.notification.publishChampionshipStandings(
       standings,
       allRaces.length,
-    );
-  }
-
-  private isSameDay(a: Date, b: Date): boolean {
-    return (
-      a.getUTCFullYear() === b.getUTCFullYear() &&
-      a.getUTCMonth() === b.getUTCMonth() &&
-      a.getUTCDate() === b.getUTCDate()
     );
   }
 }
