@@ -8,7 +8,7 @@ export class RacePollScheduler {
 
   constructor(private readonly processRace: ProcessRaceUseCase) {}
 
-  @Cron('0 * 9-11 * * 1-5')
+  @Cron('*/10 * 8-14 * * 1-5')
   async pollForFinishedRace(): Promise<void> {
     this.logger.debug('Polling for finished daily race...');
     try {

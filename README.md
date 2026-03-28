@@ -57,7 +57,7 @@ make dev
 
 El backend incluye un **scheduler (cron)** que automatiza el procesamiento de la daily sin intervencion manual:
 
-- Se ejecuta **cada minuto, de lunes a viernes, de 9:00 a 11:00** (Europe/Madrid)
+- Se ejecuta **cada 10 segundos, de lunes a viernes, de 8:00 a 14:00** (Europe/Madrid)
 - En cada ejecucion consulta la Google Meet API para comprobar si la daily ha terminado
 - Si detecta que la reunion ha finalizado (la sala se ha vaciado), procesa los resultados automaticamente:
   1. Obtiene los timestamps de entrada de cada participante
@@ -163,9 +163,9 @@ Parametros ajustables en `packages/shared/src/constants/scoring.constants.ts`:
 
 PostgreSQL con 3 tablas (terminologia F1):
 
-- **drivers**: id, google_id, display_name, email
-- **races**: id, conference_record_name, meeting_code, green_light, end_time, status
-- **starting_grid_entries**: id, race_id, driver_id, position, start_time, points, is_false_start, is_last_on_grid
+- **drivers**: id, google_id, display_name, email, created_at, updated_at
+- **races**: id, conference_record_name, meeting_code, green_light, end_time, status, processed_at, created_at
+- **starting_grid_entries**: id, race_id, driver_id, position, start_time, green_light, points, is_false_start, is_last_on_grid
 
 ### Discord
 
@@ -184,4 +184,4 @@ Ambos mensajes se publican automaticamente tras cada race procesada.
 - **APIs**: Google Meet REST API v2, Google Calendar API v3
 - **Notificaciones**: Discord webhooks
 - **Contenedores**: Docker + Docker Compose
-- **Testing**: Jest (40 tests unitarios)
+- **Testing**: Jest (41 tests unitarios)
