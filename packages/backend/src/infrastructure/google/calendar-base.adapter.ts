@@ -49,8 +49,8 @@ export abstract class GoogleCalendarBaseAdapter implements CalendarProviderPort 
     return {
       eventId: event.id!,
       title: event.summary ?? '',
-      scheduledStart: new Date(event.start?.dateTime ?? event.start?.date!),
-      scheduledEnd: new Date(event.end?.dateTime ?? event.end?.date!),
+      scheduledStart: new Date((event.start?.dateTime ?? event.start?.date)!),
+      scheduledEnd: new Date((event.end?.dateTime ?? event.end?.date)!),
       meetingCode: this.extractMeetingCode(event),
     };
   }

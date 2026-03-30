@@ -48,8 +48,8 @@ make dev
 | `make dev`                          | Levanta todos los servicios                |
 | `make stop`                         | Para todos los servicios                   |
 | `make logs`                         | Muestra logs de todos los servicios        |
-| `make backend-test`                 | Ejecuta tests del backend                  |
-| `make backend-lint`                 | Ejecuta linter del backend                 |
+| `make test`                         | Ejecuta tests                              |
+| `make lint`                         | Ejecuta linter                             |
 | `make db-migrate`                   | Ejecuta migraciones pendientes             |
 | `make db-migrate-generate NAME=xxx` | Genera una nueva migracion                 |
 | `make db-shell`                     | Abre consola psql                          |
@@ -59,7 +59,7 @@ make dev
 
 El backend incluye un **scheduler (cron)** que automatiza el procesamiento de la daily sin intervencion manual:
 
-- Se ejecuta **cada 10 segundos, de lunes a viernes, de 8:00 a 14:00** (Europe/Madrid)
+- Se ejecuta **cada 10 segundos, de lunes a viernes, de 9:00 a 12:00** (Europe/Madrid)
 - En cada ejecucion consulta la Google Meet API para comprobar si la daily ha terminado
 - Si detecta que la reunion ha finalizado (la sala se ha vaciado), procesa los resultados automaticamente:
   1. Obtiene los timestamps de entrada de cada participante
@@ -87,14 +87,6 @@ El endpoint `/races/process` es util para:
 - **Carga historica**: procesar dailies pasadas (la Meet API retiene datos 30 dias)
 - **Testing**: probar el sistema sin esperar a que haya una daily real
 
-### Datos para frontend (no consumidos aun)
-
-Estos endpoints estan preparados para cuando se implemente el frontend web:
-
-| Endpoint              | Metodo | Descripcion                                                                  |
-|-----------------------|--------|------------------------------------------------------------------------------|
-| `/races/championship` | GET    | Clasificacion general acumulada (todos los drivers con puntos, races, media) |
-
 ### Autenticacion OAuth
 
 Necesarios para el flujo de autenticacion con Google (modo `oauth`):
@@ -107,28 +99,24 @@ Necesarios para el flujo de autenticacion con Google (modo `oauth`):
 
 ## Arquitectura
 
-Monorepo con npm workspaces:
-
 ```
 packages/
   backend/     NestJS + TypeScript (arquitectura hexagonal)
-  frontend/    Next.js (panel web — placeholder)
-  shared/      Tipos y constantes compartidos
 ```
 
 ### Backend (hexagonal)
 
 ```
 src/
-  core/           Dominio: entidades puras + puertos (interfaces)
-  application/    Casos de uso (scoring, grid, process race)
-  infrastructure/ Adaptadores: Google Meet/Calendar, Discord, PostgreSQL
+  core/           Dominio: entidades puras, constantes y puertos (interfaces)
+  application/    Casos de uso (scoring, grid, process race, championship)
+  infrastructure/ Adaptadores: Google Meet/Calendar, Discord, PostgreSQL, scheduler
   api/            Controllers REST
 ```
 
-- **Core**: entidades inmutables sin dependencias de framework. Puertos definidos como interfaces con Symbol tokens para inyeccion de dependencias.
+- **Core**: entidades inmutables sin dependencias de framework. Puertos definidos como interfaces con Symbol tokens para inyeccion de dependencias. Constantes de negocio (scoring, config).
 - **Application**: casos de uso que orquestan la logica de negocio. Sin dependencias de infraestructura.
-- **Infrastructure**: adaptadores que implementan los puertos. Google Meet/Calendar (OAuth + Service Account), Discord webhook, TypeORM/PostgreSQL.
+- **Infrastructure**: adaptadores que implementan los puertos. Google Meet/Calendar (OAuth + Service Account), Discord webhook, TypeORM/PostgreSQL, scheduler cron.
 - **API**: controllers REST delgados que delegan a los casos de uso.
 
 ### Autenticacion con Google
@@ -151,7 +139,7 @@ Tarde (+5m):    1.00 (minimo por asistir)
 No asiste:      0.00
 ```
 
-Parametros ajustables en `packages/shared/src/constants/scoring.constants.ts`:
+Parametros ajustables en `packages/backend/src/core/constants/scoring.constants.ts`:
 
 | Parametro                | Valor | Descripcion                                       |
 |--------------------------|-------|---------------------------------------------------|
@@ -172,17 +160,26 @@ PostgreSQL con 4 tablas (terminologia F1):
 
 ### Discord
 
-Dos canales separados con webhooks independientes:
+Tres canales con webhooks independientes:
 
 - **#race-day**: ranking de cada daily (parrilla de salida con posiciones, puntos y tiempos)
 - **#championship**: clasificacion general acumulada (top 20 con puntos totales, carreras y media)
+- **#ruinoteca**: transcripciones de las reuniones
 
-Ambos mensajes se publican automaticamente tras cada race procesada.
+Todos los mensajes se publican automaticamente tras cada race procesada.
+
+### Docker
+
+El Dockerfile usa **multi-stage build**:
+
+- **build**: instala dependencias y compila TypeScript
+- **production**: imagen final solo con dependencias de produccion y el JS compilado
+
+En desarrollo, `docker-compose.yml` usa el stage `build` con hot reload via volume mount y `nest start --watch`.
 
 ## Stack
 
 - **Backend**: NestJS 11 + TypeScript
-- **Frontend**: Next.js (placeholder)
 - **Base de datos**: PostgreSQL 16
 - **APIs**: Google Meet REST API v2, Google Calendar API v3
 - **Notificaciones**: Discord webhooks

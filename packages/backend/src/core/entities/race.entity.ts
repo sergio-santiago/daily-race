@@ -1,8 +1,6 @@
 import { StartingGridEntry } from './starting-grid-entry.entity';
 
 export enum RaceStatus {
-  SCHEDULED = 'SCHEDULED',
-  FINISHED = 'FINISHED',
   PROCESSED = 'PROCESSED',
 }
 

@@ -1,3 +1,4 @@
+import * as path from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -26,7 +27,7 @@ import { TranscriptEntryOrmEntity } from './infrastructure/persistence/typeorm/e
         namingStrategy: new SnakeNamingStrategy(),
         synchronize: false,
         migrationsRun: true,
-        migrations: ['dist/infrastructure/persistence/typeorm/migrations/*.js'],
+        migrations: [path.join(__dirname, 'infrastructure', 'persistence', 'typeorm', 'migrations', '*.js')],
       }),
     }),
     ScheduleModule.forRoot(),

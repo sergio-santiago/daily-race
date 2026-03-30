@@ -1,14 +1,12 @@
-.PHONY: install dev stop restart logs logs-backend logs-frontend \
-       backend-test backend-test-watch backend-test-cov backend-lint backend-build backend-shell \
-       frontend-build frontend-shell \
+.PHONY: install dev stop restart logs \
+       test test-watch test-cov lint build shell \
        db-migrate db-migrate-generate db-migrate-revert db-shell \
-       shared-build clean help
+       clean help
 
 # ── Core ──────────────────────────────────────────────────────
 
 install: ## Construir imagenes e instalar dependencias
 	docker compose build
-	docker compose run --rm backend npm run build --workspace=packages/shared
 
 dev: ## Levantar todos los servicios
 	docker compose up -d
@@ -22,58 +20,39 @@ restart: ## Reiniciar todos los servicios
 logs: ## Ver logs de todos los servicios
 	docker compose logs -f
 
-logs-backend: ## Ver logs del backend
-	docker compose logs -f backend
+# ── Desarrollo ────────────────────────────────────────────────
 
-logs-frontend: ## Ver logs del frontend
-	docker compose logs -f frontend
+test: ## Ejecutar tests
+	docker compose exec -w /app/packages/backend app npx jest --passWithNoTests --maxWorkers=1
 
-# ── Backend ───────────────────────────────────────────────────
+test-watch: ## Ejecutar tests en modo watch
+	docker compose exec -w /app/packages/backend app npx jest --watch
 
-backend-test: ## Ejecutar tests del backend
-	docker compose exec -w /app/packages/backend backend npx jest --passWithNoTests --maxWorkers=1
+test-cov: ## Ejecutar tests con cobertura
+	docker compose exec -w /app/packages/backend app npx jest --coverage
 
-backend-test-watch: ## Ejecutar tests del backend en modo watch
-	docker compose exec -w /app/packages/backend backend npx jest --watch
+lint: ## Ejecutar linter
+	docker compose exec app npm run lint --workspace=packages/backend
 
-backend-test-cov: ## Ejecutar tests con cobertura
-	docker compose exec -w /app/packages/backend backend npx jest --coverage
+build: ## Compilar el proyecto
+	docker compose exec app npm run build --workspace=packages/backend
 
-backend-lint: ## Ejecutar linter del backend
-	docker compose exec backend npm run lint --workspace=packages/backend
-
-backend-build: ## Compilar el backend
-	docker compose exec backend npm run build --workspace=packages/backend
-
-backend-shell: ## Abrir shell en el contenedor del backend
-	docker compose exec backend sh
-
-# ── Frontend ──────────────────────────────────────────────────
-
-frontend-build: ## Compilar el frontend
-	docker compose exec frontend npm run build --workspace=packages/frontend
-
-frontend-shell: ## Abrir shell en el contenedor del frontend
-	docker compose exec frontend sh
+shell: ## Abrir shell en el contenedor
+	docker compose exec app sh
 
 # ── Base de datos ─────────────────────────────────────────────
 
 db-migrate: ## Ejecutar migraciones pendientes
-	docker compose exec -w /app/packages/backend backend npx typeorm-ts-node-commonjs migration:run -d src/infrastructure/persistence/typeorm/data-source.ts
+	docker compose exec -w /app/packages/backend app npx typeorm-ts-node-commonjs migration:run -d src/infrastructure/persistence/typeorm/data-source.ts
 
 db-migrate-generate: ## Generar migracion (uso: make db-migrate-generate NAME=create-drivers)
-	docker compose exec -w /app/packages/backend backend npx typeorm-ts-node-commonjs migration:generate -d src/infrastructure/persistence/typeorm/data-source.ts src/infrastructure/persistence/typeorm/migrations/$(NAME)
+	docker compose exec -w /app/packages/backend app npx typeorm-ts-node-commonjs migration:generate -d src/infrastructure/persistence/typeorm/data-source.ts src/infrastructure/persistence/typeorm/migrations/$(NAME)
 
 db-migrate-revert: ## Revertir ultima migracion
-	docker compose exec -w /app/packages/backend backend npx typeorm-ts-node-commonjs migration:revert -d src/infrastructure/persistence/typeorm/data-source.ts
+	docker compose exec -w /app/packages/backend app npx typeorm-ts-node-commonjs migration:revert -d src/infrastructure/persistence/typeorm/data-source.ts
 
 db-shell: ## Abrir consola psql
 	docker compose exec db psql -U dailyrace -d dailyrace
-
-# ── Shared ────────────────────────────────────────────────────
-
-shared-build: ## Compilar paquete shared
-	docker compose exec backend npm run build --workspace=packages/shared
 
 # ── Utilidades ────────────────────────────────────────────────
 

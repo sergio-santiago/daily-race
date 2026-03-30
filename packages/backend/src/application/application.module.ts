@@ -17,6 +17,6 @@ import { FindConferenceRecordService } from './find-conference-record.service';
     GetChampionshipStandingsUseCase,
     FindConferenceRecordService,
   ],
-  exports: [ProcessRaceUseCase, GetChampionshipStandingsUseCase],
+  exports: [ProcessRaceUseCase],
 })
 export class ApplicationModule {}

@@ -34,7 +34,7 @@ import { BuildStartingGridUseCase } from './build-starting-grid.use-case';
 import { GetChampionshipStandingsUseCase } from './get-championship-standings.use-case';
 import { FindConferenceRecordService } from './find-conference-record.service';
 import { ConfigService } from '@nestjs/config';
-import { DAILY_MEETING_CODE, ALL_TIME_START, ALL_TIME_END } from '@daily-race/shared';
+import { DAILY_MEETING_CODE, ALL_TIME_START, ALL_TIME_END } from '../core/constants';
 
 @Injectable()
 export class ProcessRaceUseCase {

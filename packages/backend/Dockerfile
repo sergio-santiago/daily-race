@@ -1,23 +1,27 @@
+FROM node:22-alpine AS build
+
+WORKDIR /app
+
+COPY package.json package-lock.json* tsconfig.base.json ./
+COPY packages/backend/package.json ./packages/backend/
+
+RUN npm ci
+
+COPY packages/backend/ ./packages/backend/
+
+RUN npm run build --workspace=packages/backend
+
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy root config files
-COPY package.json package-lock.json* tsconfig.base.json ./
-COPY packages/shared/package.json ./packages/shared/
+COPY package.json package-lock.json* ./
 COPY packages/backend/package.json ./packages/backend/
-# Frontend package.json needed for workspace resolution even if not used
-COPY packages/frontend/package.json ./packages/frontend/
 
-RUN npm install
+RUN npm ci --omit=dev && npm cache clean --force
 
-# Copy source
-COPY packages/shared/ ./packages/shared/
-COPY packages/backend/ ./packages/backend/
-
-# Build shared types
-RUN npm run build --workspace=packages/shared
+COPY --from=build /app/packages/backend/dist ./packages/backend/dist
 
 EXPOSE 3001
 
-CMD ["npm", "run", "start:dev", "--workspace=packages/backend"]
+CMD ["node", "packages/backend/dist/main.js"]
