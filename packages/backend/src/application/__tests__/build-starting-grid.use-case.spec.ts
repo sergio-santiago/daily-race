@@ -1,7 +1,7 @@
 import { BuildStartingGridUseCase } from '../build-starting-grid.use-case';
 import { CalculatePointsUseCase } from '../calculate-points.use-case';
 import { MeetParticipantData } from '../../core/ports/meet.provider.port';
-import { DECAY_FACTOR, MAX_POINTS, MIN_POINTS } from '@daily-race/shared';
+import { DECAY_FACTOR, MAX_POINTS, MIN_POINTS } from '../../core/constants';
 
 function pts(diffSeconds: number): number {
   return Math.max(MAX_POINTS * Math.exp(-diffSeconds / DECAY_FACTOR), MIN_POINTS);

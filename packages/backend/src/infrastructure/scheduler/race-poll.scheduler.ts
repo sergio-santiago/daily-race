@@ -8,8 +8,7 @@ export class RacePollScheduler {
 
   constructor(private readonly processRace: ProcessRaceUseCase) {}
 
-  // FIXME: cambiar a '*/10 * 8-14 * * 1-5' para produccion (solo L-V). Ahora incluye fines de semana para pruebas.
-  @Cron('*/10 * 8-14 * * *')
+  @Cron('*/10 * 9-11 * * 1-5')
   async pollForFinishedRace(): Promise<void> {
     this.logger.debug('Polling for finished daily race...');
     try {

@@ -11,9 +11,6 @@ const config: Config = {
   collectCoverageFrom: ['**/*.ts', '!**/*.spec.ts', '!**/index.ts', '!main.ts'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
-  moduleNameMapper: {
-    '^@daily-race/shared(.*)$': '<rootDir>/../../shared/src$1',
-  },
 };
 
 export default config;

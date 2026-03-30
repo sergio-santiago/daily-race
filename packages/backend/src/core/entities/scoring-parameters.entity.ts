@@ -4,7 +4,7 @@ import {
   WINDOW_SECONDS,
   MIN_POINTS,
   MAX_POINTS,
-} from '@daily-race/shared';
+} from '../constants';
 
 export class ScoringParameters {
   constructor(

@@ -1,4 +1,4 @@
-import { Test } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ProcessRaceUseCase } from '../process-race.use-case';
 import { BuildStartingGridUseCase } from '../build-starting-grid.use-case';
@@ -37,7 +37,7 @@ import {
   NOTIFICATION_PORT,
   NotificationPort,
 } from '../../core/ports/notification.port';
-import { Race, RaceStatus } from '../../core/entities/race.entity';
+import { Race } from '../../core/entities/race.entity';
 
 function mockCalendarEvent(): CalendarEventData {
   return {
@@ -76,7 +76,7 @@ function mockParticipants(): MeetParticipantData[] {
 }
 
 describe('ProcessRaceUseCase', () => {
-  let module: any;
+  let module: TestingModule;
   let useCase: ProcessRaceUseCase;
   let meetProvider: jest.Mocked<MeetProviderPort>;
   let calendarProvider: jest.Mocked<CalendarProviderPort>;

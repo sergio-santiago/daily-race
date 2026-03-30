@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Race } from '../../core/entities/race.entity';
 import { StartingGridEntry } from '../../core/entities/starting-grid-entry.entity';
 import { ChampionshipStanding } from '../../core/entities/championship-standing.entity';
-import { DEFAULT_TIMEZONE, WINDOW_SECONDS } from '@daily-race/shared';
+import { DEFAULT_TIMEZONE } from '../../core/constants';
 
 const SEP = '\u2500';
 const CHAMPIONSHIP_TOP_DRIVERS = 20;
@@ -165,8 +165,6 @@ export class DiscordFormatterService {
     racesCount: number,
   ): string {
     const leader = standings[0];
-    const raceWord = racesCount === 1 ? 'carrera disputada' : 'carreras disputadas';
-
     const lines: string[] = [];
     lines.push(`\u{1F3C1}  Carreras disputadas: **${racesCount}**`);
     lines.push(`\u{1F3CE}\u{FE0F}  Pilotos: **${standings.length}**`);

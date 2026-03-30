@@ -16,10 +16,12 @@ services:
       timeout: 5s
       retries: 5
 
-  backend:
+  app:
     build:
       context: .
       dockerfile: packages/backend/Dockerfile
+      target: build
+    command: npm run start:dev --workspace=packages/backend
     restart: unless-stopped
     depends_on:
       db:
@@ -47,25 +49,8 @@ services:
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     volumes:
-      - ./packages/shared/src:/app/packages/shared/src
       - ./packages/backend/src:/app/packages/backend/src
       - google-tokens:/app/data
-
-  frontend:
-    build:
-      context: .
-      dockerfile: packages/frontend/Dockerfile
-    restart: unless-stopped
-    depends_on:
-      - backend
-    environment:
-      - NODE_ENV=${NODE_ENV:-development}
-      - NEXT_PUBLIC_API_URL=http://localhost:${BACKEND_PORT:-3001}
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
-    volumes:
-      - ./packages/shared/src:/app/packages/shared/src
-      - ./packages/frontend/src:/app/packages/frontend/src
 
 volumes:
   pgdata:
