@@ -1,0 +1,187 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  lint:
+    name: Lint
+    if: github.repository == 'secture/daily-race'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-project
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npm run lint
+
+  type-check:
+    name: Type Check
+    if: github.repository == 'secture/daily-race'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-project
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npx tsc --noEmit -p packages/backend/tsconfig.json
+
+  test:
+    name: Tests
+    if: github.repository == 'secture/daily-race'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-project
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npm test
+
+  build-and-push-image:
+    name: Build and push Docker image
+    needs: [lint, type-check, test]
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      tag: ${{ steps.tag.outputs.new_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate tag from commit messages
+        id: tag
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release_branches: main
+          default_bump: patch
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./packages/backend/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.new_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to server
+    if: success()
+    needs: [build-and-push-image]
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SSH_USER: ${{ vars.SSH_USER_STAGING }}
+      SSH_HOST: ${{ vars.SSH_HOST_STAGING }}
+      SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY_STAGING }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate .env
+        run: |
+          set -euo pipefail
+          cat > .env <<'EOL'
+          APP_VERSION=${{ needs.build-and-push-image.outputs.tag }}
+          NODE_ENV=production
+          BACKEND_PORT=${{ vars.BACKEND_PORT }}
+          POSTGRES_DB=${{ vars.POSTGRES_DB }}
+          POSTGRES_USER=${{ vars.POSTGRES_USER }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          GOOGLE_AUTH_MODE=${{ vars.GOOGLE_AUTH_MODE }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI=${{ vars.GOOGLE_REDIRECT_URI }}
+          GOOGLE_CLIENT_EMAIL=${{ secrets.GOOGLE_CLIENT_EMAIL }}
+          GOOGLE_PRIVATE_KEY=${{ secrets.GOOGLE_PRIVATE_KEY }}
+          GOOGLE_IMPERSONATE_EMAILS=${{ vars.GOOGLE_IMPERSONATE_EMAILS }}
+          GOOGLE_CALENDAR_ID=${{ vars.GOOGLE_CALENDAR_ID }}
+          DAILY_MEETING_CODE=${{ vars.DAILY_MEETING_CODE }}
+          DISCORD_WEBHOOK_RACE_DAY=${{ secrets.DISCORD_WEBHOOK_RACE_DAY }}
+          DISCORD_WEBHOOK_CHAMPIONSHIP=${{ secrets.DISCORD_WEBHOOK_CHAMPIONSHIP }}
+          DISCORD_WEBHOOK_RUINOTECA=${{ secrets.DISCORD_WEBHOOK_RUINOTECA }}
+          TZ=${{ vars.TZ }}
+          EOL
+          chmod 600 .env
+
+      - name: Ensure deploy target folder exists
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key: ${{ env.SSH_KEY }}
+          script: mkdir -p /srv/www/daily-race
+
+      - name: Sync compose and .env to server
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key: ${{ env.SSH_KEY }}
+          source: './docker-compose.production.yml,./.env'
+          target: /srv/www/daily-race
+          overwrite: true
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key: ${{ env.SSH_KEY }}
+          script: |
+            set -euo pipefail
+
+            APP_VERSION="${{ needs.build-and-push-image.outputs.tag }}"
+            IMAGE_NAME="ghcr.io/${{ github.repository }}:${APP_VERSION}"
+
+            echo "Logging in to GitHub Container Registry..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            echo "Pulling Docker image: $IMAGE_NAME"
+            docker pull "$IMAGE_NAME"
+
+            cd /srv/www/daily-race
+            chmod 600 .env
+
+            echo "Restarting containers..."
+            docker compose -f docker-compose.production.yml down --remove-orphans
+            APP_VERSION="$APP_VERSION" docker compose -f docker-compose.production.yml up -d --force-recreate
+
+            echo "Waiting for app to start..."
+            for i in {1..10}; do
+              sleep 5
+              if RESPONSE=$(curl -fsS http://localhost:${{ vars.BACKEND_PORT }}/health); then
+                echo "$RESPONSE"
+                echo "Healthcheck passed on attempt #$i"
+                exit 0
+              fi
+              echo "Attempt #$i failed, retrying..."
+            done
+
+            echo "Healthcheck failed after 10 attempts."
+            exit 1

@@ -117,4 +117,85 @@ describe('FindConferenceRecordService', () => {
 
     expect(result!.name).toBe('conferenceRecords/abc123');
   });
+
+  describe('findActiveForEvent', () => {
+  it('should find an active record (no endTime) on the same day', async () => {
+    meetProvider.getConferenceRecords.mockResolvedValue([
+      {
+        name: 'conferenceRecords/active1',
+        meetingCode: 'wye-iwfu-jch',
+        startTime: new Date('2026-03-27T09:31:00.000Z'),
+        endTime: null,
+      },
+    ]);
+
+    const result = await service.findActiveForEvent(mockCalendarEvent());
+
+    expect(result).not.toBeNull();
+    expect(result!.name).toBe('conferenceRecords/active1');
+  });
+
+  it('should return null when no active records exist', async () => {
+    meetProvider.getConferenceRecords.mockResolvedValue([mockRecord()]);
+
+    const result = await service.findActiveForEvent(mockCalendarEvent());
+
+    expect(result).toBeNull();
+  });
+
+  it('should return null when active record is from a different day', async () => {
+    meetProvider.getConferenceRecords.mockResolvedValue([
+      {
+        name: 'conferenceRecords/active-other-day',
+        meetingCode: 'wye-iwfu-jch',
+        startTime: new Date('2026-03-26T09:30:00.000Z'),
+        endTime: null,
+      },
+    ]);
+
+    const result = await service.findActiveForEvent(mockCalendarEvent());
+
+    expect(result).toBeNull();
+  });
+
+  it('should reject active record too far from scheduled time (>30min)', async () => {
+    meetProvider.getConferenceRecords.mockResolvedValue([
+      {
+        name: 'conferenceRecords/early-test',
+        meetingCode: 'wye-iwfu-jch',
+        startTime: new Date('2026-03-27T08:00:00.000Z'),
+        endTime: null,
+      },
+    ]);
+
+    const result = await service.findActiveForEvent(mockCalendarEvent());
+
+    expect(result).toBeNull();
+  });
+  });
+
+  describe('findByName', () => {
+  it('should find a record by name', async () => {
+    meetProvider.getConferenceRecords.mockResolvedValue([mockRecord()]);
+
+    const result = await service.findByName(
+      'wye-iwfu-jch',
+      'conferenceRecords/abc123',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.name).toBe('conferenceRecords/abc123');
+  });
+
+  it('should return null when name does not match', async () => {
+    meetProvider.getConferenceRecords.mockResolvedValue([mockRecord()]);
+
+    const result = await service.findByName(
+      'wye-iwfu-jch',
+      'conferenceRecords/unknown',
+    );
+
+    expect(result).toBeNull();
+  });
+  });
 });

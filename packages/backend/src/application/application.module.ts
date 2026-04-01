@@ -7,6 +7,7 @@ import { BuildStartingGridUseCase } from './build-starting-grid.use-case';
 import { ProcessRaceUseCase } from './process-race.use-case';
 import { GetChampionshipStandingsUseCase } from './get-championship-standings.use-case';
 import { FindConferenceRecordService } from './find-conference-record.service';
+import { MonitorLiveRaceUseCase } from './monitor-live-race.use-case';
 
 @Module({
   imports: [PersistenceModule, GoogleModule, DiscordModule],
@@ -16,7 +17,8 @@ import { FindConferenceRecordService } from './find-conference-record.service';
     ProcessRaceUseCase,
     GetChampionshipStandingsUseCase,
     FindConferenceRecordService,
+    MonitorLiveRaceUseCase,
   ],
-  exports: [ProcessRaceUseCase],
+  exports: [ProcessRaceUseCase, MonitorLiveRaceUseCase],
 })
 export class ApplicationModule {}
