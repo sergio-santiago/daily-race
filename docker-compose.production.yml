@@ -1,0 +1,61 @@
+services:
+  app:
+    image: ghcr.io/secture/daily-race:${APP_VERSION:-latest}
+    container_name: daily-race-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:${BACKEND_PORT}:3001'
+    volumes:
+      - google-tokens:/app/data
+    environment:
+      NODE_ENV: production
+      BACKEND_PORT: 3001
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      GOOGLE_AUTH_MODE: ${GOOGLE_AUTH_MODE}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      GOOGLE_CLIENT_EMAIL: ${GOOGLE_CLIENT_EMAIL:-}
+      GOOGLE_PRIVATE_KEY: ${GOOGLE_PRIVATE_KEY:-}
+      GOOGLE_IMPERSONATE_EMAILS: ${GOOGLE_IMPERSONATE_EMAILS:-}
+      GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID:-primary}
+      DAILY_MEETING_CODE: ${DAILY_MEETING_CODE}
+      DISCORD_WEBHOOK_RACE_DAY: ${DISCORD_WEBHOOK_RACE_DAY}
+      DISCORD_WEBHOOK_CHAMPIONSHIP: ${DISCORD_WEBHOOK_CHAMPIONSHIP}
+      DISCORD_WEBHOOK_RUINOTECA: ${DISCORD_WEBHOOK_RUINOTECA}
+      TZ: ${TZ:-Europe/Madrid}
+    networks:
+      - app-network
+
+  db:
+    image: postgres:16-alpine
+    container_name: daily-race-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  pgdata:
+  google-tokens:

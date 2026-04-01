@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NotificationPort } from '../../core/ports/notification.port';
 import { Race } from '../../core/entities/race.entity';
+import { StartingGridEntry } from '../../core/entities/starting-grid-entry.entity';
 import { ChampionshipStanding } from '../../core/entities/championship-standing.entity';
 import { TranscriptEntryData } from '../../core/ports/transcript.repository.port';
 import { DiscordFormatterService } from './discord-formatter.service';
@@ -86,6 +87,33 @@ export class DiscordWebhookAdapter implements NotificationPort {
     }
   }
 
+  async createLiveRaceMessage(
+    grid: StartingGridEntry[],
+    greenLight: Date,
+  ): Promise<string> {
+    const embeds = this.formatter.formatLiveRaceEmbeds(grid, greenLight);
+    const body = { username: 'Daily Race', embeds };
+    const response = await this.sendWebhookWithResponse(body, this.raceDayWebhook);
+    return response.id as string;
+  }
+
+  async editLiveRaceMessage(
+    messageId: string,
+    grid: StartingGridEntry[],
+    greenLight: Date,
+  ): Promise<void> {
+    const embeds = this.formatter.formatLiveRaceEmbeds(grid, greenLight);
+    await this.editWebhookMessage(messageId, { embeds }, this.raceDayWebhook);
+  }
+
+  async editLiveRaceMessageAsFinal(
+    messageId: string,
+    race: Race,
+  ): Promise<void> {
+    const embeds = this.formatter.formatRaceEmbeds(race);
+    await this.editWebhookMessage(messageId, { embeds }, this.raceDayWebhook);
+  }
+
   private sleep(ms: number): Promise<void> {
     return new Promise((r) => setTimeout(r, ms));
   }
@@ -105,6 +133,41 @@ export class DiscordWebhookAdapter implements NotificationPort {
         `Discord webhook failed: ${response.status} ${response.statusText}`,
       );
       throw new Error(`Discord webhook failed: ${response.status}`);
+    }
+  }
+
+  private async sendWebhookWithResponse(
+    body: Record<string, unknown>,
+    webhookUrl: string,
+  ): Promise<Record<string, unknown>> {
+    const response = await fetch(`${webhookUrl}?wait=true`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Discord webhook failed: ${response.status}`);
+    }
+    return response.json() as Promise<Record<string, unknown>>;
+  }
+
+  private async editWebhookMessage(
+    messageId: string,
+    body: Record<string, unknown>,
+    webhookUrl: string,
+  ): Promise<void> {
+    const response = await fetch(`${webhookUrl}/messages/${messageId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      this.logger.error(
+        `Discord message edit failed: ${response.status} ${response.statusText}`,
+      );
+      throw new Error(`Discord message edit failed: ${response.status}`);
     }
   }
 }

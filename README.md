@@ -57,18 +57,23 @@ make dev
 
 ## Funcionamiento automatico
 
-El backend incluye un **scheduler (cron)** que automatiza el procesamiento de la daily sin intervencion manual:
+El backend incluye un **scheduler (cron)** que monitoriza la daily **en tiempo real**:
 
-- Se ejecuta **cada 10 segundos, de lunes a viernes, de 9:00 a 12:00** (Europe/Madrid)
-- En cada ejecucion consulta la Google Meet API para comprobar si la daily ha terminado
-- Si detecta que la reunion ha finalizado (la sala se ha vaciado), procesa los resultados automaticamente:
-  1. Obtiene los timestamps de entrada de cada participante
-  2. Calcula los puntos segun el sistema de puntuacion
-  3. Persiste los datos en PostgreSQL (drivers, race, starting grid)
-  4. Publica el ranking en **#race-day** (Discord)
-  5. Publica la clasificacion general actualizada en **#championship** (Discord)
-- Solo procesa reuniones que terminaron **despues** de la hora programada (si alguien entra y sale antes del green light, se ignora)
+- Se ejecuta **cada 5 segundos, de lunes a viernes, de 9:00 a 12:00** (Europe/Madrid)
+- **Durante la reunion** (meeting activo en Google Meet):
+  1. Detecta el meeting activo y crea un mensaje **en directo** en **#race-day** (Discord)
+  2. Cada 5 segundos comprueba si hay nuevos participantes
+  3. Si alguien nuevo entra, recalcula la parrilla y **edita el mismo mensaje** con el grid actualizado
+  4. El mensaje muestra posiciones, puntos y el Rey de la Ruina en tiempo real
+- **Al terminar la reunion** (la sala se vacia):
+  1. Persiste los datos en PostgreSQL (drivers, race, starting grid)
+  2. Edita el mensaje live al **formato final** (de "EN DIRECTO" a resultado definitivo)
+  3. Guarda las transcripciones si estan disponibles
+  4. Publica la clasificacion general actualizada en **#championship** (Discord)
+- Solo monitoriza reuniones que empezaron cerca de la hora programada del evento (±30 minutos)
 - Si la daily ya fue procesada, no la reprocesa (idempotente)
+
+**Procesamiento historico**: el endpoint `POST /races/process` sigue disponible para procesar dailies pasadas o forzar un reprocesamiento manual.
 
 **Para que funcione en automatico, el backend debe estar corriendo continuamente** (en un servidor, VPS, o Cloud Run). En desarrollo local con `make dev`, el scheduler tambien esta activo.
 
@@ -184,7 +189,7 @@ En desarrollo, `docker-compose.yml` usa el stage `build` con hot reload via volu
 - **APIs**: Google Meet REST API v2, Google Calendar API v3
 - **Notificaciones**: Discord webhooks
 - **Contenedores**: Docker + Docker Compose
-- **Testing**: Jest (62 tests unitarios)
+- **Testing**: Jest (78 tests unitarios)
 
 ## Documentacion adicional
 

@@ -73,6 +73,72 @@ export class DiscordFormatterService {
     };
   }
 
+  // ── Live Race ──────────────────────────────────────────────
+
+  formatLiveRaceEmbeds(
+    grid: StartingGridEntry[],
+    greenLight: Date,
+  ): DiscordEmbed[] {
+    const dateStr = this.formatDate(greenLight);
+    const gridText = this.buildGridText(grid);
+    const stats = this.buildLiveStats(grid, greenLight);
+    const chunks = this.chunkText(gridText, 4000);
+
+    return chunks.map((chunk, i) => {
+      const embed: DiscordEmbed = {
+        color: 0xe74c3c,
+        description: `\`\`\`\n${chunk}\n\`\`\``,
+      };
+
+      if (i === 0) {
+        embed.title = `\u{1F534}  EN DIRECTO  \u{2014}  DAILY RACE  \u{2014}  ${dateStr}`;
+      }
+      if (i === chunks.length - 1) {
+        embed.fields = [{ name: '', value: stats, inline: false }];
+        embed.footer = { text: 'Daily Race \u{2014} Secture \u{2014} EN DIRECTO' };
+        embed.timestamp = new Date().toISOString();
+      }
+
+      return embed;
+    });
+  }
+
+  private buildLiveStats(
+    grid: StartingGridEntry[],
+    greenLight: Date,
+  ): string {
+    const timeStr = this.formatTime(greenLight);
+    const falseStarters = grid.filter((e) => e.isFalseStart);
+    const cleanGrid = grid.filter((e) => !e.isFalseStart);
+    const bestDriver = cleanGrid[0];
+    const lastDriver = grid[grid.length - 1];
+
+    const lines: string[] = [];
+
+    lines.push(`\u{1F6A5}  Green Light: **${timeStr}**`);
+    lines.push(`\u{1F3CE}\u{FE0F}  Pilotos: **${grid.length}**`);
+
+    if (bestDriver) {
+      lines.push(
+        `\u{1F3C6}  Pole Position: **${bestDriver.driver.displayName}**  \u{2014}  ${bestDriver.points.toFixed(2)} pts`,
+      );
+    }
+
+    if (lastDriver) {
+      lines.push(
+        `\u{1F451}  Rey de la Ruina: **${lastDriver.driver.displayName}**  \u{2014}  ${this.formatDiff(lastDriver.diffSeconds).trim()}`,
+      );
+    }
+
+    if (falseStarters.length > 0) {
+      const fsNames = falseStarters.map((e) => e.driver.displayName).join(', ');
+      const fsLabel = falseStarters.length === 1 ? 'Salida en falso' : 'Salidas en falso';
+      lines.push(`\u{26D4}  ${fsLabel}: ${fsNames}`);
+    }
+
+    return lines.join('\n');
+  }
+
   // ── Grid building ──────────────────────────────────────────
 
   private buildGridText(grid: StartingGridEntry[]): string {
