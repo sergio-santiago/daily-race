@@ -97,9 +97,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
-      SSH_USER: ${{ vars.SSH_USER_STAGING }}
-      SSH_HOST: ${{ vars.SSH_HOST_STAGING }}
-      SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY_STAGING }}
+      SSH_USER: ${{ vars.DEPLOY_SSH_USER_PODO }}
+      SSH_HOST: ${{ vars.DEPLOY_SSH_HOST_PODO }}
+      SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY_PODO }}
     steps:
       - uses: actions/checkout@v4
 
@@ -116,7 +116,6 @@ jobs:
           GOOGLE_AUTH_MODE=${{ vars.GOOGLE_AUTH_MODE }}
           GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REDIRECT_URI=${{ vars.GOOGLE_REDIRECT_URI }}
           GOOGLE_CLIENT_EMAIL=${{ secrets.GOOGLE_CLIENT_EMAIL }}
           GOOGLE_PRIVATE_KEY=${{ secrets.GOOGLE_PRIVATE_KEY }}
           GOOGLE_IMPERSONATE_EMAILS=${{ vars.GOOGLE_IMPERSONATE_EMAILS }}
@@ -127,6 +126,7 @@ jobs:
           DISCORD_WEBHOOK_RUINOTECA=${{ secrets.DISCORD_WEBHOOK_RUINOTECA }}
           TZ=${{ vars.TZ }}
           EOL
+          sed -i 's/^[[:space:]]*//' .env
           chmod 600 .env
 
       - name: Ensure deploy target folder exists
@@ -143,9 +143,10 @@ jobs:
           host: ${{ env.SSH_HOST }}
           username: ${{ env.SSH_USER }}
           key: ${{ env.SSH_KEY }}
-          source: './docker-compose.production.yml,./.env'
+          source: 'docker-compose.production.yml,.env'
           target: /srv/www/daily-race
           overwrite: true
+          strip_components: 0
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.2
