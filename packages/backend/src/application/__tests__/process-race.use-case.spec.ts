@@ -100,6 +100,7 @@ describe('ProcessRaceUseCase', () => {
       findByConferenceRecordName: jest.fn(),
       findByDateRange: jest.fn(),
       existsByConferenceRecordName: jest.fn(),
+      existsProcessedRaceForSchedule: jest.fn().mockResolvedValue(false),
     };
     driverRepository = {
       save: jest.fn(),

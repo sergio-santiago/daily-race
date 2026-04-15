@@ -52,4 +52,16 @@ export class RaceTypeOrmRepository implements RaceRepositoryPort {
   async existsByConferenceRecordName(name: string): Promise<boolean> {
     return this.repo.existsBy({ conferenceRecordName: name });
   }
+
+  async existsProcessedRaceForSchedule(
+    meetingCode: string,
+    scheduledStart: Date,
+  ): Promise<boolean> {
+    return this.repo
+      .createQueryBuilder('race')
+      .where('race.meetingCode = :meetingCode', { meetingCode })
+      .andWhere('race.greenLight = :scheduledStart', { scheduledStart })
+      .andWhere('race.endTime > race.greenLight')
+      .getExists();
+  }
 }

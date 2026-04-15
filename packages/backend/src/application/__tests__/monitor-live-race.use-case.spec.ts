@@ -80,6 +80,7 @@ describe('MonitorLiveRaceUseCase', () => {
       findByConferenceRecordName: jest.fn(),
       findByDateRange: jest.fn().mockResolvedValue([]),
       existsByConferenceRecordName: jest.fn().mockResolvedValue(false),
+      existsProcessedRaceForSchedule: jest.fn().mockResolvedValue(false),
     };
     driverRepository = {
       save: jest.fn(),
@@ -179,6 +180,49 @@ describe('MonitorLiveRaceUseCase', () => {
       await useCase.execute();
 
       expect(notification.createLiveRaceMessage).not.toHaveBeenCalled();
+    });
+
+    it('should skip when daily already processed (reopen after meeting ended)', async () => {
+      calendarProvider.getDailyEvent.mockResolvedValue(mockCalendarEvent());
+      findConferenceRecord.findActiveForEvent.mockResolvedValue({
+        name: 'conf/reopen',
+        meetingCode: 'wye-iwfu-jch',
+        startTime: new Date('2026-03-27T09:57:00.000Z'),
+        endTime: null,
+      });
+      raceRepository.existsByConferenceRecordName.mockResolvedValue(false);
+      raceRepository.existsProcessedRaceForSchedule.mockResolvedValue(true);
+
+      await useCase.execute();
+
+      expect(
+        raceRepository.existsProcessedRaceForSchedule,
+      ).toHaveBeenCalledWith(
+        'wye-iwfu-jch',
+        new Date('2026-03-27T09:30:00.000Z'),
+      );
+      expect(notification.createLiveRaceMessage).not.toHaveBeenCalled();
+      expect(meetProvider.getParticipants).not.toHaveBeenCalled();
+    });
+
+    it('should still start tracking when a spurious pre-daily race exists', async () => {
+      // Existing race with endTime before scheduledStart must not block
+      // detection. The adapter filters those out via endTime > greenLight,
+      // so the port returns false here.
+      calendarProvider.getDailyEvent.mockResolvedValue(mockCalendarEvent());
+      findConferenceRecord.findActiveForEvent.mockResolvedValue({
+        name: 'conf/real',
+        meetingCode: 'wye-iwfu-jch',
+        startTime: new Date('2026-03-27T09:30:00.000Z'),
+        endTime: null,
+      });
+      raceRepository.existsByConferenceRecordName.mockResolvedValue(false);
+      raceRepository.existsProcessedRaceForSchedule.mockResolvedValue(false);
+      meetProvider.getParticipants.mockResolvedValue(mockParticipants(3));
+
+      await useCase.execute();
+
+      expect(notification.createLiveRaceMessage).toHaveBeenCalledTimes(1);
     });
   });
 

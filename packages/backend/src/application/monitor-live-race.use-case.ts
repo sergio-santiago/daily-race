@@ -95,6 +95,18 @@ export class MonitorLiveRaceUseCase {
       await this.raceRepository.existsByConferenceRecordName(activeRecord.name);
     if (alreadySaved) return;
 
+    const dailyAlreadyProcessed =
+      await this.raceRepository.existsProcessedRaceForSchedule(
+        calendarEvent.meetingCode,
+        calendarEvent.scheduledStart,
+      );
+    if (dailyAlreadyProcessed) {
+      this.logger.debug(
+        `Daily already processed for ${calendarEvent.scheduledStart.toISOString()}, ignoring reopen of ${activeRecord.name}`,
+      );
+      return;
+    }
+
     const participants = await this.meetProvider.getParticipants(
       activeRecord.name,
     );
