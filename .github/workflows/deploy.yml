@@ -17,6 +17,12 @@ env:
   NODE_VERSION: '22'
 
 jobs:
+  security:
+    name: Security
+    if: github.repository == 'secture/daily-race'
+    uses: ./.github/workflows/security.yml
+    secrets: inherit
+
   lint:
     name: Lint
     if: github.repository == 'secture/daily-race'
@@ -52,7 +58,7 @@ jobs:
 
   build-and-push-image:
     name: Build and push Docker image
-    needs: [lint, type-check, test]
+    needs: [security, lint, type-check, test]
     runs-on: ubuntu-latest
     environment: production
     outputs:
