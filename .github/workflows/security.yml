@@ -1,4 +1,4 @@
-name: Security
+name: 🛡️ Security
 
 on:
   push:
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   npm-audit:
-    name: NPM Audit
+    name: 📋 NPM Audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,7 +28,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
   semgrep:
-    name: Semgrep
+    name: 🧬 Semgrep
     runs-on: ubuntu-latest
     container:
       image: semgrep/semgrep
@@ -38,7 +38,7 @@ jobs:
         run: semgrep scan --config p/typescript --config p/javascript --config p/security-audit --config p/secrets --error --metrics=off
 
   gitleaks:
-    name: Gitleaks
+    name: 🔑 Gitleaks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

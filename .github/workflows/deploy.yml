@@ -1,4 +1,4 @@
-name: Deploy
+name: 🏁 Deploy
 
 on:
   push:
@@ -13,12 +13,9 @@ permissions:
   contents: write
   packages: write
 
-env:
-  NODE_VERSION: '22'
-
 jobs:
   security:
-    name: Security
+    name: 🛡️ Security
     if: github.repository == 'secture/daily-race'
     permissions:
       contents: read
@@ -27,42 +24,15 @@ jobs:
     uses: ./.github/workflows/security.yml
     secrets: inherit
 
-  lint:
-    name: Lint
+  testing:
+    name: 🔬 Testing
     if: github.repository == 'secture/daily-race'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-node-project
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - run: npm run lint
-
-  type-check:
-    name: Type Check
-    if: github.repository == 'secture/daily-race'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-node-project
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - run: npx tsc --noEmit -p packages/backend/tsconfig.json
-
-  test:
-    name: Tests
-    if: github.repository == 'secture/daily-race'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-node-project
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - run: npm test
+    uses: ./.github/workflows/testing.yml
+    secrets: inherit
 
   build-and-push-image:
-    name: Build and push Docker image
-    needs: [security, lint, type-check, test]
+    name: 🐳 Build and push image
+    needs: [security, testing]
     runs-on: ubuntu-latest
     environment: production
     outputs:
@@ -70,7 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate tag from commit messages
+      - name: 🏷️ Generate tag from commit messages
         id: tag
         uses: mathieudutour/github-tag-action@v6.2
         with:
@@ -80,14 +50,14 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: 🔐 Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: 📦 Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -101,7 +71,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy:
-    name: Deploy to server
+    name: 🚀 Deploy to server
     if: success()
     needs: [build-and-push-image]
     runs-on: ubuntu-latest
@@ -113,7 +83,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate .env
+      - name: 📝 Generate .env
         run: |
           set -euo pipefail
           cat > .env <<'EOL'
@@ -139,7 +109,7 @@ jobs:
           sed -i 's/^[[:space:]]*//' .env
           chmod 600 .env
 
-      - name: Ensure deploy target folder exists
+      - name: 📁 Ensure deploy target folder exists
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ env.SSH_HOST }}
@@ -147,7 +117,7 @@ jobs:
           key: ${{ env.SSH_KEY }}
           script: mkdir -p /srv/www/daily-race
 
-      - name: Sync compose and .env to server
+      - name: 📤 Sync compose and .env to server
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ env.SSH_HOST }}
@@ -158,7 +128,7 @@ jobs:
           overwrite: true
           strip_components: 0
 
-      - name: Deploy via SSH
+      - name: 🖥️ Deploy via SSH
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ env.SSH_HOST }}
