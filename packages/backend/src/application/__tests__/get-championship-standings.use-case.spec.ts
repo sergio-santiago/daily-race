@@ -44,6 +44,7 @@ describe('GetChampionshipStandingsUseCase', () => {
       saveAll: jest.fn(),
       findByRaceId: jest.fn(),
       findByDriverInDateRange: jest.fn(),
+      updatePointsAndPosition: jest.fn(),
     };
 
     const module = await Test.createTestingModule({

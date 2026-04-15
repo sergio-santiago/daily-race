@@ -1,56 +1,35 @@
-import { Injectable, Optional } from '@nestjs/common';
-import { ScoringParameters } from '../core/entities/scoring-parameters.entity';
+import { Injectable } from '@nestjs/common';
+import {
+  F1_POINTS,
+  ATTENDANCE_POINTS,
+  FALSE_START_PENALTY,
+  NO_ATTENDANCE_POINTS,
+} from '../core/constants';
 
 export interface CalculatePointsInput {
-  entryTime: Date;
-  scheduledTime: Date;
+  position: number;
+  isFalseStart: boolean;
 }
 
 export interface CalculatePointsResult {
   points: number;
-  diffSeconds: number;
-  isFalseStart: boolean;
 }
 
 @Injectable()
 export class CalculatePointsUseCase {
-  private readonly params: ScoringParameters;
-
-  constructor(@Optional() params?: ScoringParameters) {
-    this.params = params ?? new ScoringParameters();
-  }
-
   execute(input: CalculatePointsInput): CalculatePointsResult {
-    const diffSeconds =
-      (input.entryTime.getTime() - input.scheduledTime.getTime()) / 1000;
-
-    if (diffSeconds < 0) {
-      return {
-        points: diffSeconds * this.params.falseStartMultiplier,
-        diffSeconds,
-        isFalseStart: true,
-      };
+    if (input.isFalseStart) {
+      return { points: FALSE_START_PENALTY };
     }
 
-    if (diffSeconds <= this.params.windowSeconds) {
-      const raw =
-        this.params.maxPoints *
-        Math.exp(-diffSeconds / this.params.decayFactor);
-      return {
-        points: Math.max(raw, this.params.minPoints),
-        diffSeconds,
-        isFalseStart: false,
-      };
+    if (input.position >= 1 && input.position <= F1_POINTS.length) {
+      return { points: F1_POINTS[input.position - 1] };
     }
 
-    return {
-      points: this.params.minPoints,
-      diffSeconds,
-      isFalseStart: false,
-    };
+    return { points: ATTENDANCE_POINTS };
   }
 
   noAttendance(): CalculatePointsResult {
-    return { points: 0.0, diffSeconds: Infinity, isFalseStart: false };
+    return { points: NO_ATTENDANCE_POINTS };
   }
 }

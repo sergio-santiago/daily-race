@@ -148,7 +148,7 @@ describe('DiscordFormatterService', () => {
       const standings = [
         new ChampionshipStanding(
           new Driver('d1', 'g1', 'Leader', null),
-          500.0, 5, 0, 1, 1,
+          125, 5, 0, 1, 1,
         ),
       ];
 
@@ -157,7 +157,7 @@ describe('DiscordFormatterService', () => {
 
       expect(stats).toContain('L\u00edder');
       expect(stats).toContain('Leader');
-      expect(stats).toContain('500.00');
+      expect(stats).toContain('125');
       expect(stats).toContain('5');
     });
 
