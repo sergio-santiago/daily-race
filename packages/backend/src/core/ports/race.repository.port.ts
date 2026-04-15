@@ -8,4 +8,8 @@ export interface RaceRepositoryPort {
   findByConferenceRecordName(name: string): Promise<Race | null>;
   findByDateRange(start: Date, end: Date): Promise<Race[]>;
   existsByConferenceRecordName(name: string): Promise<boolean>;
+  existsProcessedRaceForSchedule(
+    meetingCode: string,
+    scheduledStart: Date,
+  ): Promise<boolean>;
 }
