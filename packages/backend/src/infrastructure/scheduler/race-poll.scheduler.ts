@@ -8,7 +8,7 @@ export class RacePollScheduler {
 
   constructor(private readonly monitorLiveRace: MonitorLiveRaceUseCase) {}
 
-  @Cron('*/5 * 9-11 * * 1-5')
+  @Cron('*/5 * 9-11 * * 1-5', { timeZone: 'Europe/Madrid' })
   async pollForRace(): Promise<void> {
     this.logger.debug('Polling for daily race...');
     try {
