@@ -20,6 +20,10 @@ jobs:
   security:
     name: Security
     if: github.repository == 'secture/daily-race'
+    permissions:
+      contents: read
+      pull-requests: read
+      security-events: write
     uses: ./.github/workflows/security.yml
     secrets: inherit
 
