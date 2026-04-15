@@ -1,14 +1,11 @@
-/** Velocidad de decaimiento de la exponencial (menor = cae mas rapido) */
-export const DECAY_FACTOR = 30;
+/** Puntos F1 por posicion (indice 0 = P1, indice 9 = P10) */
+export const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1] as const;
 
-/** Multiplicador de penalizacion por false start (salida en falso) */
-export const FALSE_START_MULTIPLIER = 20;
+/** Puntos por asistir (posicion >10) */
+export const ATTENDANCE_POINTS = 1;
 
-/** Ventana de puntuacion en segundos (5 minutos) */
-export const WINDOW_SECONDS = 300;
+/** Penalizacion por salida en falso (entrar antes del green light) */
+export const FALSE_START_PENALTY = -5;
 
-/** Puntos minimos por asistir (despues de la ventana) */
-export const MIN_POINTS = 1;
-
-/** Puntos maximos (entrar en el ms 0) */
-export const MAX_POINTS = 100;
+/** Puntos por no asistir */
+export const NO_ATTENDANCE_POINTS = 0;

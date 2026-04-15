@@ -120,7 +120,7 @@ export class DiscordFormatterService {
 
     if (bestDriver) {
       lines.push(
-        `\u{1F3C6}  Pole Position: **${bestDriver.driver.displayName}**  \u{2014}  ${bestDriver.points.toFixed(2)} pts`,
+        `\u{1F3C6}  Pole Position: **${bestDriver.driver.displayName}**  \u{2014}  ${bestDriver.points} pts`,
       );
     }
 
@@ -167,9 +167,9 @@ export class DiscordFormatterService {
     const rows = standings.map((s) => {
       const pos = this.championshipPosLabel(s.rank);
       const name = this.truncate(s.driver.displayName, NAME_MAX_CHAMPIONSHIP);
-      const pts = s.totalPoints.toFixed(2).padStart(8);
+      const pts = String(s.totalPoints).padStart(5);
       const races = String(s.racesAttended).padStart(2);
-      const avg = (s.totalPoints / s.racesAttended).toFixed(2).padStart(7);
+      const avg = (s.totalPoints / s.racesAttended).toFixed(1).padStart(5);
       return `${pos} ${name} ${pts} ${races} ${avg}`;
     });
 
@@ -177,11 +177,11 @@ export class DiscordFormatterService {
       '     ' +
       'Piloto'.padEnd(NAME_MAX_CHAMPIONSHIP) +
       ' ' +
-      'Total'.padStart(8) +
+      'Total'.padStart(5) +
       ' ' +
       'GP'.padStart(2) +
       ' ' +
-      'Media'.padStart(7);
+      'Media'.padStart(5);
 
     return [header, SEP.repeat(header.length), '', ...rows].join('\n');
   }
@@ -207,7 +207,7 @@ export class DiscordFormatterService {
 
     if (bestDriver) {
       lines.push(
-        `\u{1F3C6}  Pole Position: **${bestDriver.driver.displayName}**  \u{2014}  ${bestDriver.points.toFixed(2)} pts`,
+        `\u{1F3C6}  Pole Position: **${bestDriver.driver.displayName}**  \u{2014}  ${bestDriver.points} pts`,
       );
     }
 
@@ -236,7 +236,7 @@ export class DiscordFormatterService {
     lines.push(`\u{1F3CE}\u{FE0F}  Pilotos: **${standings.length}**`);
     if (leader) {
       lines.push(
-        `\u{1F3C6}  L\u{00ED}der: **${leader.driver.displayName}**  \u{2014}  ${leader.totalPoints.toFixed(2)} pts`,
+        `\u{1F3C6}  L\u{00ED}der: **${leader.driver.displayName}**  \u{2014}  ${leader.totalPoints} pts`,
       );
     }
 
@@ -248,7 +248,7 @@ export class DiscordFormatterService {
   formatGridRow(entry: StartingGridEntry): string {
     const pos = this.positionLabel(entry);
     const name = this.truncate(entry.driver.displayName, NAME_MAX_GRID);
-    const pts = entry.points.toFixed(2).padStart(8);
+    const pts = String(entry.points).padStart(4);
     const diff = this.formatDiff(entry.diffSeconds);
 
     return `${pos} ${name} ${pts} ${diff}`;

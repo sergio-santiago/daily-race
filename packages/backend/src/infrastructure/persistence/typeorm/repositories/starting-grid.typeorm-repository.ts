@@ -49,4 +49,22 @@ export class StartingGridTypeOrmRepository
     });
     return orms.map(StartingGridEntryMapper.toDomain);
   }
+
+  async updatePointsAndPosition(
+    updates: Array<{
+      raceId: string;
+      driverId: string;
+      position: number;
+      points: number;
+    }>,
+  ): Promise<void> {
+    await Promise.all(
+      updates.map((u) =>
+        this.repo.update(
+          { raceId: u.raceId, driverId: u.driverId },
+          { position: u.position, points: u.points },
+        ),
+      ),
+    );
+  }
 }

@@ -22,8 +22,6 @@ export class BuildStartingGridUseCase {
     );
 
     const lastIndex = sorted.length - 1;
-
-    // Position only counts for non-false-start entries
     let gridPosition = 0;
 
     return sorted.map((p, index) => {
@@ -34,12 +32,13 @@ export class BuildStartingGridUseCase {
         p.email,
       );
 
-      const { points, isFalseStart } = this.calculatePoints.execute({
-        entryTime: p.earliestStartTime,
-        scheduledTime: greenLight,
-      });
-
+      const isFalseStart = p.earliestStartTime.getTime() < greenLight.getTime();
       if (!isFalseStart) gridPosition++;
+
+      const { points } = this.calculatePoints.execute({
+        position: isFalseStart ? 0 : gridPosition,
+        isFalseStart,
+      });
 
       return new StartingGridEntry(
         isFalseStart ? 0 : gridPosition,

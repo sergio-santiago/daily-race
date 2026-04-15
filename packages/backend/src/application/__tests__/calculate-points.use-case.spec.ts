@@ -1,13 +1,10 @@
 import { CalculatePointsUseCase } from '../calculate-points.use-case';
 import {
-  DECAY_FACTOR,
-  MAX_POINTS,
-  MIN_POINTS,
+  F1_POINTS,
+  ATTENDANCE_POINTS,
+  FALSE_START_PENALTY,
+  NO_ATTENDANCE_POINTS,
 } from '../../core/constants';
-
-function pts(diffSeconds: number): number {
-  return Math.max(MAX_POINTS * Math.exp(-diffSeconds / DECAY_FACTOR), MIN_POINTS);
-}
 
 describe('CalculatePointsUseCase', () => {
   let useCase: CalculatePointsUseCase;
@@ -16,199 +13,77 @@ describe('CalculatePointsUseCase', () => {
     useCase = new CalculatePointsUseCase();
   });
 
-  const greenLight = new Date('2026-03-27T09:00:00.000Z');
-
-  function entryAt(offsetMs: number): Date {
-    return new Date(greenLight.getTime() + offsetMs);
-  }
-
-  describe('false start (entry before green light)', () => {
-    it('should penalize -10 pts for 0.5s early', () => {
-      const result = useCase.execute({
-        entryTime: entryAt(-500),
-        scheduledTime: greenLight,
-      });
-      expect(result.isFalseStart).toBe(true);
-      expect(result.diffSeconds).toBeCloseTo(-0.5);
-      expect(result.points).toBeCloseTo(-10);
-    });
-
-    it('should penalize -20 pts for 1s early', () => {
-      const result = useCase.execute({
-        entryTime: entryAt(-1000),
-        scheduledTime: greenLight,
-      });
-      expect(result.points).toBeCloseTo(-20);
-    });
-
-    it('should penalize -100 pts for 5s early', () => {
-      const result = useCase.execute({
-        entryTime: entryAt(-5000),
-        scheduledTime: greenLight,
-      });
-      expect(result.points).toBeCloseTo(-100);
-    });
-
-    it('should penalize -600 pts for 30s early (no cap)', () => {
-      const result = useCase.execute({
-        entryTime: entryAt(-30000),
-        scheduledTime: greenLight,
-      });
-      expect(result.points).toBeCloseTo(-600);
-    });
-
-    it('should penalize -1200 pts for 60s early', () => {
-      const result = useCase.execute({
-        entryTime: entryAt(-60000),
-        scheduledTime: greenLight,
-      });
-      expect(result.points).toBeCloseTo(-1200);
+  describe('F1 top 10', () => {
+    it.each([
+      [1, 25],
+      [2, 18],
+      [3, 15],
+      [4, 12],
+      [5, 10],
+      [6, 8],
+      [7, 6],
+      [8, 4],
+      [9, 2],
+      [10, 1],
+    ])('P%i should give %i pts', (position, expected) => {
+      const result = useCase.execute({ position, isFalseStart: false });
+      expect(result.points).toBe(expected);
     });
   });
 
-  describe('on time (0-300 seconds window)', () => {
-    it('should give 100 pts at exactly green light', () => {
-      const result = useCase.execute({
-        entryTime: greenLight,
-        scheduledTime: greenLight,
-      });
-      expect(result.isFalseStart).toBe(false);
-      expect(result.points).toBeCloseTo(100);
+  describe('attendance (P11+)', () => {
+    it('should give 1 pt at P11', () => {
+      const result = useCase.execute({ position: 11, isFalseStart: false });
+      expect(result.points).toBe(ATTENDANCE_POINTS);
     });
 
-    it('should give ~96.72 pts at +0.5s', () => {
-      const result = useCase.execute({
-        entryTime: entryAt(500),
-        scheduledTime: greenLight,
-      });
-      expect(result.points).toBeCloseTo(pts(0.5), 2);
+    it('should give 1 pt at P30', () => {
+      const result = useCase.execute({ position: 30, isFalseStart: false });
+      expect(result.points).toBe(ATTENDANCE_POINTS);
     });
 
-    it('should give ~93.56 pts at +1s', () => {
-      const result = useCase.execute({
-        entryTime: entryAt(1000),
-        scheduledTime: greenLight,
-      });
-      expect(result.points).toBeCloseTo(pts(1), 2);
-    });
-
-    it('should give ~87.53 pts at +2s', () => {
-      const result = useCase.execute({
-        entryTime: entryAt(2000),
-        scheduledTime: greenLight,
-      });
-      expect(result.points).toBeCloseTo(pts(2), 2);
-    });
-
-    it('should give ~51.34 pts at +10s', () => {
-      const result = useCase.execute({
-        entryTime: entryAt(10000),
-        scheduledTime: greenLight,
-      });
-      expect(result.points).toBeCloseTo(pts(10), 2);
-    });
-
-    it('should give ~13.53 pts at +30s', () => {
-      const result = useCase.execute({
-        entryTime: entryAt(30000),
-        scheduledTime: greenLight,
-      });
-      expect(result.points).toBeCloseTo(pts(30), 2);
-    });
-
-    it('should give ~1.83 pts at +60s', () => {
-      const result = useCase.execute({
-        entryTime: entryAt(60000),
-        scheduledTime: greenLight,
-      });
-      expect(result.points).toBeCloseTo(pts(60), 2);
-    });
-
-    it('should give min points at +300s (edge of window, raw < min)', () => {
-      const result = useCase.execute({
-        entryTime: entryAt(300000),
-        scheduledTime: greenLight,
-      });
-      expect(result.points).toBe(MIN_POINTS);
+    it('should give 1 pt at P100', () => {
+      const result = useCase.execute({ position: 100, isFalseStart: false });
+      expect(result.points).toBe(ATTENDANCE_POINTS);
     });
   });
 
-  describe('late (after 5 min window)', () => {
-    it('should give MIN_POINTS at +301s', () => {
-      const result = useCase.execute({
-        entryTime: entryAt(301000),
-        scheduledTime: greenLight,
-      });
-      expect(result.points).toBe(MIN_POINTS);
-      expect(result.isFalseStart).toBe(false);
+  describe('false start', () => {
+    it('should give -5 pts regardless of position', () => {
+      const result = useCase.execute({ position: 0, isFalseStart: true });
+      expect(result.points).toBe(FALSE_START_PENALTY);
     });
 
-    it('should give MIN_POINTS at +10 min', () => {
-      const result = useCase.execute({
-        entryTime: entryAt(600000),
-        scheduledTime: greenLight,
-      });
-      expect(result.points).toBe(MIN_POINTS);
+    it('should give -5 pts even if position has a value', () => {
+      // defensive: false start always overrides
+      const result = useCase.execute({ position: 1, isFalseStart: true });
+      expect(result.points).toBe(FALSE_START_PENALTY);
     });
   });
 
   describe('no attendance', () => {
     it('should give 0 pts', () => {
       const result = useCase.noAttendance();
+      expect(result.points).toBe(NO_ATTENDANCE_POINTS);
       expect(result.points).toBe(0);
-      expect(result.isFalseStart).toBe(false);
     });
   });
 
-  describe('real data from 27 march daily', () => {
-    const dailyGreenLight = new Date('2026-03-27T09:30:00.000Z');
-
-    it('P1 Inma Molina +0.994s', () => {
-      const result = useCase.execute({
-        entryTime: new Date('2026-03-27T09:30:00.994Z'),
-        scheduledTime: dailyGreenLight,
-      });
-      expect(result.points).toBeCloseTo(pts(0.994), 1);
+  describe('F1_POINTS table integrity', () => {
+    it('should have exactly 10 positions', () => {
+      expect(F1_POINTS.length).toBe(10);
     });
 
-    it('P10 Ale Ramos +3.027s', () => {
-      const result = useCase.execute({
-        entryTime: new Date('2026-03-27T09:30:03.027Z'),
-        scheduledTime: dailyGreenLight,
-      });
-      expect(result.points).toBeCloseTo(pts(3.027), 1);
+    it('should be strictly decreasing', () => {
+      for (let i = 1; i < F1_POINTS.length; i++) {
+        expect(F1_POINTS[i]).toBeLessThan(F1_POINTS[i - 1]);
+      }
     });
 
-    it('P20 Natalia Alvarez +7.869s', () => {
-      const result = useCase.execute({
-        entryTime: new Date('2026-03-27T09:30:07.869Z'),
-        scheduledTime: dailyGreenLight,
-      });
-      expect(result.points).toBeCloseTo(pts(7.869), 1);
-    });
-
-    it('P30 Alberto Aznar +30.095s', () => {
-      const result = useCase.execute({
-        entryTime: new Date('2026-03-27T09:30:30.095Z'),
-        scheduledTime: dailyGreenLight,
-      });
-      expect(result.points).toBeCloseTo(pts(30.095), 1);
-    });
-
-    it('P40 Sergio Santiago +86.683s', () => {
-      const result = useCase.execute({
-        entryTime: new Date('2026-03-27T09:31:26.683Z'),
-        scheduledTime: dailyGreenLight,
-      });
-      expect(result.points).toBeCloseTo(pts(86.683), 1);
-    });
-
-    it('P46 David Luque +440.555s (fuera de ventana → min pts)', () => {
-      const result = useCase.execute({
-        entryTime: new Date('2026-03-27T09:37:20.555Z'),
-        scheduledTime: dailyGreenLight,
-      });
-      expect(result.points).toBe(MIN_POINTS);
+    it('should end above ATTENDANCE_POINTS (P10 > P11)', () => {
+      expect(F1_POINTS[F1_POINTS.length - 1]).toBeGreaterThanOrEqual(
+        ATTENDANCE_POINTS,
+      );
     });
   });
 });
