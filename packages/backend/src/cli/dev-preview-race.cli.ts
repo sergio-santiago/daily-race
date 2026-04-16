@@ -12,7 +12,12 @@ import {
 import { ALL_TIME_START, ALL_TIME_END } from '../core/constants';
 
 async function run() {
-  const logger = new Logger('preview-race-message');
+  if (process.env.NODE_ENV === 'production') {
+    console.error('dev:preview-race is disabled in production');
+    process.exit(1);
+  }
+
+  const logger = new Logger('dev:preview-race');
   const raceIdArg = process.argv[2];
 
   const app = await NestFactory.createApplicationContext(AppModule, {

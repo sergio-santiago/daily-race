@@ -16,8 +16,8 @@
     "migration:generate": "npm run typeorm -- migration:generate -d src/infrastructure/persistence/typeorm/data-source.ts",
     "migration:run": "npm run typeorm -- migration:run -d src/infrastructure/persistence/typeorm/data-source.ts",
     "migration:revert": "npm run typeorm -- migration:revert -d src/infrastructure/persistence/typeorm/data-source.ts",
-    "cli:republish-championship": "node dist/cli/republish-championship.cli.js",
-    "cli:preview-race-message": "node dist/cli/preview-race-message.cli.js"
+    "dev:preview-race": "node dist/cli/dev-preview-race.cli.js",
+    "dev:preview-championship": "node dist/cli/dev-preview-championship.cli.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

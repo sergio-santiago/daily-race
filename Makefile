@@ -54,13 +54,13 @@ db-migrate-revert: ## Revertir ultima migracion
 db-shell: ## Abrir consola psql
 	docker compose exec db psql -U dailyrace -d dailyrace
 
-# ── CLI (operaciones administrativas) ─────────────────────────
+# ── Dev (preview local, no funciona en production) ───────────
 
-cli-republish-championship: ## Republicar mensaje del championship standings a Discord
-	docker compose exec -w /app/packages/backend app npm run cli:republish-championship
+dev-preview-race: ## Publicar race de prueba a Discord (uso: make dev-preview-race RACE_ID=<uuid>)
+	docker compose exec -w /app/packages/backend app node dist/cli/dev-preview-race.cli.js $(RACE_ID)
 
-cli-preview-race-message: ## Publicar mensaje de race a Discord (uso: make cli-preview-race-message RACE_ID=<uuid>)
-	docker compose exec -w /app/packages/backend app node dist/cli/preview-race-message.cli.js $(RACE_ID)
+dev-preview-championship: ## Publicar championship de prueba a Discord
+	docker compose exec -w /app/packages/backend app node dist/cli/dev-preview-championship.cli.js
 
 # ── Utilidades ────────────────────────────────────────────────
 

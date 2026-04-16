@@ -13,7 +13,12 @@ import {
 import { ALL_TIME_START, ALL_TIME_END } from '../core/constants';
 
 async function run() {
-  const logger = new Logger('republish-championship');
+  if (process.env.NODE_ENV === 'production') {
+    console.error('dev:preview-championship is disabled in production');
+    process.exit(1);
+  }
+
+  const logger = new Logger('dev:preview-championship');
   const app = await NestFactory.createApplicationContext(AppModule, {
     logger: ['log', 'warn', 'error'],
   });
