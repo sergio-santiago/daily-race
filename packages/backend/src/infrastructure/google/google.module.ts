@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { MEET_PROVIDER } from '../../core/ports/meet.provider.port';
 import { CALENDAR_PROVIDER } from '../../core/ports/calendar.provider.port';
 import { AUTH_PROVIDER } from '../../core/ports/auth.provider.port';
@@ -10,50 +9,40 @@ import { GoogleMeetServiceAccountAdapter } from './meet-service-account.adapter'
 import { GoogleCalendarServiceAccountAdapter } from './calendar-service-account.adapter';
 import { ServiceAccountAuthProvider } from './service-account-auth.provider';
 
+const isServiceAccount =
+  process.env.GOOGLE_AUTH_MODE === 'service-account';
+
 @Module({
   providers: [
-    GoogleAuthService,
-    GoogleMeetOAuthAdapter,
-    GoogleCalendarOAuthAdapter,
+    // SA providers — always safe, no external credentials needed
+    ServiceAccountAuthProvider,
     GoogleMeetServiceAccountAdapter,
     GoogleCalendarServiceAccountAdapter,
-    ServiceAccountAuthProvider,
+
+    // OAuth providers — only in oauth mode (require GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI)
+    ...(isServiceAccount
+      ? []
+      : [GoogleAuthService, GoogleMeetOAuthAdapter, GoogleCalendarOAuthAdapter]),
+
     {
       provide: MEET_PROVIDER,
-      useFactory: (
-        config: ConfigService,
-        oauth: GoogleMeetOAuthAdapter,
-        sa: GoogleMeetServiceAccountAdapter,
-      ) => (config.get('GOOGLE_AUTH_MODE') === 'service-account' ? sa : oauth),
-      inject: [
-        ConfigService,
-        GoogleMeetOAuthAdapter,
-        GoogleMeetServiceAccountAdapter,
-      ],
+      useExisting: isServiceAccount
+        ? GoogleMeetServiceAccountAdapter
+        : GoogleMeetOAuthAdapter,
     },
     {
       provide: CALENDAR_PROVIDER,
-      useFactory: (
-        config: ConfigService,
-        oauth: GoogleCalendarOAuthAdapter,
-        sa: GoogleCalendarServiceAccountAdapter,
-      ) => (config.get('GOOGLE_AUTH_MODE') === 'service-account' ? sa : oauth),
-      inject: [
-        ConfigService,
-        GoogleCalendarOAuthAdapter,
-        GoogleCalendarServiceAccountAdapter,
-      ],
+      useExisting: isServiceAccount
+        ? GoogleCalendarServiceAccountAdapter
+        : GoogleCalendarOAuthAdapter,
     },
     {
       provide: AUTH_PROVIDER,
-      useFactory: (
-        config: ConfigService,
-        oauth: GoogleAuthService,
-        sa: ServiceAccountAuthProvider,
-      ) => (config.get('GOOGLE_AUTH_MODE') === 'service-account' ? sa : oauth),
-      inject: [ConfigService, GoogleAuthService, ServiceAccountAuthProvider],
+      useExisting: isServiceAccount
+        ? ServiceAccountAuthProvider
+        : GoogleAuthService,
     },
   ],
-  exports: [MEET_PROVIDER, CALENDAR_PROVIDER, AUTH_PROVIDER, GoogleAuthService],
+  exports: [MEET_PROVIDER, CALENDAR_PROVIDER, AUTH_PROVIDER],
 })
 export class GoogleModule {}
