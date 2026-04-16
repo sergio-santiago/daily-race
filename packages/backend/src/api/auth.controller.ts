@@ -1,4 +1,4 @@
-import { Controller, Get, Inject, Query, Res } from '@nestjs/common';
+import { Controller, Get, Inject, Query, Res, ForbiddenException } from '@nestjs/common';
 import { Response } from 'express';
 import { AUTH_PROVIDER, AuthProviderPort } from '../core/ports/auth.provider.port';
 
@@ -11,6 +11,7 @@ export class AuthController {
 
   @Get('google')
   startGoogleAuth(@Res() res: Response) {
+    this.assertNotProduction();
     const url = this.authProvider.getAuthUrl();
     res.redirect(url);
   }
@@ -20,6 +21,7 @@ export class AuthController {
     @Query('code') code: string,
     @Res() res: Response,
   ) {
+    this.assertNotProduction();
     if (!code) {
       res.status(400).json({ error: 'Missing code parameter' });
       return;
@@ -37,5 +39,11 @@ export class AuthController {
     return {
       authenticated: this.authProvider.isAuthenticated(),
     };
+  }
+
+  private assertNotProduction(): void {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('OAuth endpoints are disabled in production');
+    }
   }
 }
