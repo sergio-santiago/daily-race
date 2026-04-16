@@ -7,7 +7,7 @@ import { DEFAULT_TIMEZONE } from '../../core/constants';
 const SEP = '\u2500';
 const HEAVY_SEP = '\u2550';
 const ELLIPSIS = '\u2026';
-const REZAGADO_THRESHOLD = 60;
+const REZAGADO_RATIO = 0.1;
 
 // Discord hard-caps embed description at 4096 chars. We chunk the monospace
 // table body with a safety margin to leave room for the summary line on the
@@ -26,11 +26,11 @@ const COL_GAP = '  ';
 const COL_GRID_PTS = 5;
 const COL_GRID_TIME = 13;
 
-// Championship table columns — total row: 4+2+24+2+5+2+3+2+3+2+3 = 52 chars
+// Championship table columns — total row: 4+2+24+2+5+2+4+2+4+2+4 = 55 chars
 const COL_CHAMP_PTS = 5;
-const COL_CHAMP_GP = 3;
-const COL_CHAMP_W = 3;
-const COL_CHAMP_PODIUM = 3;
+const COL_CHAMP_GP = 4;
+const COL_CHAMP_W = 4;
+const COL_CHAMP_PODIUM = 4;
 
 export interface DiscordEmbed {
   title?: string;
@@ -50,9 +50,14 @@ export class DiscordFormatterService {
     const dateStr = this.formatDate(race.greenLight);
     const timeStr = this.formatTime(race.greenLight);
     const driversLabel = grid.length === 1 ? 'piloto' : 'pilotos';
-    const summary = `\u{1F6A5}  **${timeStr}**  \u{B7}  \u{1F3CE}\u{FE0F}  **${grid.length}** ${driversLabel}`;
+    const falseStarters = grid.filter((e) => e.isFalseStart);
+    let summary = `\u{1F6A5}  **${timeStr}**  \u{B7}  \u{1F3CE}\u{FE0F}  **${grid.length}** ${driversLabel}`;
+    if (falseStarters.length > 0) {
+      const fsLabel = falseStarters.length === 1 ? 'salida en falso' : 'salidas en falso';
+      summary += `  \u{B7}  \u{1F6A8}  **${falseStarters.length}** ${fsLabel}`;
+    }
 
-    const gridText = this.buildGridText(grid);
+    const gridText = this.buildGridText(grid, race.greenLight);
     const stats = this.buildRaceStats(race);
 
     const chunks = this.chunkText(gridText, DESCRIPTION_CHUNK_LIMIT);
@@ -130,8 +135,13 @@ export class DiscordFormatterService {
     const dateStr = this.formatDate(greenLight);
     const timeStr = this.formatTime(greenLight);
     const driversLabel = grid.length === 1 ? 'piloto' : 'pilotos';
-    const summary = `\u{1F6A5}  **${timeStr}**  \u{B7}  \u{1F3CE}\u{FE0F}  **${grid.length}** ${driversLabel}`;
-    const gridText = this.buildGridText(grid);
+    const falseStarters = grid.filter((e) => e.isFalseStart);
+    let summary = `\u{1F6A5}  **${timeStr}**  \u{B7}  \u{1F3CE}\u{FE0F}  **${grid.length}** ${driversLabel}`;
+    if (falseStarters.length > 0) {
+      const fsLabel = falseStarters.length === 1 ? 'salida en falso' : 'salidas en falso';
+      summary += `  \u{B7}  \u{1F6A8}  **${falseStarters.length}** ${fsLabel}`;
+    }
+    const gridText = this.buildGridText(grid, greenLight);
     const stats = this.buildLiveStats(grid);
     const chunks = this.chunkText(gridText, DESCRIPTION_CHUNK_LIMIT);
 
@@ -161,28 +171,18 @@ export class DiscordFormatterService {
   }
 
   private buildLiveStats(grid: StartingGridEntry[]): string {
-    const falseStarters = grid.filter((e) => e.isFalseStart);
     const kingOfRuina = grid.find((e) => e.isLastOnGrid);
+    if (!kingOfRuina) return '';
 
-    const lines: string[] = [];
-
-    if (kingOfRuina) {
-      lines.push(
-        `\u{1F451}  Rey de la Ruina: **${kingOfRuina.driver.displayName}**  \u{2014}  ${this.formatDiff(kingOfRuina.diffSeconds).trim()}`,
-      );
-    }
-
-    if (falseStarters.length > 0) {
-      const fsLabel = falseStarters.length === 1 ? 'Salida en falso' : 'Salidas en falso';
-      lines.push(`\u{1F6A8}  ${fsLabel}: **${falseStarters.length}**`);
-    }
-
-    return lines.join('\n');
+    return `\u{1F451}  Rey de la Ruina: **${kingOfRuina.driver.displayName}** (${this.formatDiff(kingOfRuina.diffSeconds).trim()})`;
   }
 
   // ── Grid building ──────────────────────────────────────────
 
-  private buildGridText(grid: StartingGridEntry[]): string {
+  private buildGridText(
+    grid: StartingGridEntry[],
+    greenLight: Date,
+  ): string {
     // False starters: peor posicion primero (Rey con corona arriba)
     const falseStarters = grid
       .filter((e) => e.isFalseStart)
@@ -199,14 +199,13 @@ export class DiscordFormatterService {
     if (falseStarters.length > 0) {
       for (const e of falseStarters) sections.push(this.formatGridRow(e));
       sections.push('');
-      const greenLight = falseStarters[0]?.greenLight;
-      if (greenLight) {
-        sections.push(this.buildGreenLightMarker(greenLight, header.length));
-        sections.push('');
-      }
     }
 
-    for (const e of cleanGrid) sections.push(this.formatGridRow(e));
+    sections.push(this.buildGreenLightMarker(greenLight, header.length));
+    sections.push('');
+
+    for (const e of cleanGrid)
+      sections.push(this.formatGridRow(e, cleanGrid.length));
 
     return sections.join('\n');
   }
@@ -276,30 +275,19 @@ export class DiscordFormatterService {
   // ── Stats building ─────────────────────────────────────────
 
   private buildRaceStats(race: Race): string {
-    const grid = race.startingGrid;
-    const falseStarters = grid.filter((e) => e.isFalseStart);
-    const kingOfRuina = grid.find((e) => e.isLastOnGrid);
+    const kingOfRuina = race.startingGrid.find((e) => e.isLastOnGrid);
+    if (!kingOfRuina) return '';
 
-    const lines: string[] = [];
-
-    if (kingOfRuina) {
-      lines.push(
-        `\u{1F451}  Rey de la Ruina: **${kingOfRuina.driver.displayName}**  \u{2014}  ${this.formatDiff(kingOfRuina.diffSeconds).trim()}`,
-      );
-    }
-
-    if (falseStarters.length > 0) {
-      const fsLabel = falseStarters.length === 1 ? 'Salida en falso' : 'Salidas en falso';
-      lines.push(`\u{1F6A8}  ${fsLabel}: **${falseStarters.length}**`);
-    }
-
-    return lines.join('\n');
+    return `\u{1F451}  Rey de la Ruina: **${kingOfRuina.driver.displayName}** (${this.formatDiff(kingOfRuina.diffSeconds).trim()})`;
   }
 
   // ── Row formatting ─────────────────────────────────────────
 
-  formatGridRow(entry: StartingGridEntry): string {
-    const pos = this.positionLabel(entry);
+  formatGridRow(
+    entry: StartingGridEntry,
+    cleanGridSize?: number,
+  ): string {
+    const pos = this.positionLabel(entry, cleanGridSize);
     const name = this.truncate(entry.driver.displayName, COL_NAME);
     const pts = String(entry.points).padStart(COL_GRID_PTS);
     const diff = this.formatDiff(entry.diffSeconds);
@@ -307,7 +295,7 @@ export class DiscordFormatterService {
     return pos + COL_GAP + name + COL_GAP + pts + COL_GAP + diff;
   }
 
-  positionLabel(entry: StartingGridEntry): string {
+  positionLabel(entry: StartingGridEntry, cleanGridSize?: number): string {
     const numStr = String(entry.position).padStart(2);
 
     if (entry.isFalseStart) {
@@ -319,7 +307,12 @@ export class DiscordFormatterService {
     if (n === 2) return ' 2\u{1F948}';
     if (n === 3) return ' 3\u{1F949}';
     if (entry.isLastOnGrid) return numStr + '\u{1F451}';
-    if (entry.diffSeconds > REZAGADO_THRESHOLD) return numStr + '\u{1F422}';
+    if (
+      cleanGridSize &&
+      n > cleanGridSize - Math.floor(cleanGridSize * REZAGADO_RATIO)
+    ) {
+      return numStr + '\u{1F422}';
+    }
     return numStr + '  ';
   }
 
@@ -354,6 +347,7 @@ export class DiscordFormatterService {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
+      year: 'numeric',
       timeZone: DEFAULT_TIMEZONE,
     });
   }
