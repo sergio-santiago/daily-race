@@ -32,10 +32,14 @@ export class GetChampionshipStandingsUseCase {
         );
       if (entries.length === 0) continue;
 
-      const cleanEntries = entries.filter((e) => e.position > 0);
+      const cleanEntries = entries.filter((e) => !e.isFalseStart);
       const bestFinish = cleanEntries.length > 0
         ? Math.min(...cleanEntries.map((e) => e.position))
         : 0;
+      const wins = cleanEntries.filter((e) => e.position === 1).length;
+      const podiums = cleanEntries.filter(
+        (e) => e.position >= 1 && e.position <= 3,
+      ).length;
 
       standings.push(
         new ChampionshipStanding(
@@ -45,6 +49,8 @@ export class GetChampionshipStandingsUseCase {
           entries.filter((e) => e.isFalseStart).length,
           bestFinish,
           0,
+          wins,
+          podiums,
         ),
       );
     }
@@ -60,6 +66,8 @@ export class GetChampionshipStandingsUseCase {
           s.falseStarts,
           s.bestFinish,
           i + 1,
+          s.wins,
+          s.podiums,
         ),
     );
   }

@@ -42,12 +42,29 @@ export class RecalculatePointsUseCase {
         (a, b) => a.startTime.getTime() - b.startTime.getTime(),
       );
 
+      // King of Ruina: first in sorted list if any false start, else last
+      const hasFalseStart =
+        sorted.length > 0 &&
+        sorted[0].startTime.getTime() < sorted[0].greenLight.getTime();
+      const kingIndex = hasFalseStart ? 0 : sorted.length - 1;
+
+      // False starters get the last positions in the ranking (see
+      // BuildStartingGridUseCase for rationale).
+      const totalCount = sorted.length;
       let gridPosition = 0;
-      const updates = sorted.map((entry) => {
+      let falseStartIndex = 0;
+
+      const updates = sorted.map((entry, index) => {
         const isFalseStart =
           entry.startTime.getTime() < entry.greenLight.getTime();
-        if (!isFalseStart) gridPosition++;
-        const position = isFalseStart ? 0 : gridPosition;
+        let position: number;
+        if (isFalseStart) {
+          position = totalCount - falseStartIndex;
+          falseStartIndex++;
+        } else {
+          gridPosition++;
+          position = gridPosition;
+        }
         const { points } = this.calculatePoints.execute({
           position,
           isFalseStart,
@@ -57,10 +74,11 @@ export class RecalculatePointsUseCase {
           driverId: entry.driver.id,
           position,
           points,
+          isLastOnGrid: index === kingIndex,
         };
       });
 
-      await this.gridRepository.updatePointsAndPosition(updates);
+      await this.gridRepository.updateEntries(updates);
       entriesUpdated += updates.length;
 
       this.logger.log(

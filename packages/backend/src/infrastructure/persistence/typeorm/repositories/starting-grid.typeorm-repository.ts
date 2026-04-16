@@ -50,19 +50,24 @@ export class StartingGridTypeOrmRepository
     return orms.map(StartingGridEntryMapper.toDomain);
   }
 
-  async updatePointsAndPosition(
+  async updateEntries(
     updates: Array<{
       raceId: string;
       driverId: string;
       position: number;
       points: number;
+      isLastOnGrid: boolean;
     }>,
   ): Promise<void> {
     await Promise.all(
       updates.map((u) =>
         this.repo.update(
           { raceId: u.raceId, driverId: u.driverId },
-          { position: u.position, points: u.points },
+          {
+            position: u.position,
+            points: u.points,
+            isLastOnGrid: u.isLastOnGrid,
+          },
         ),
       ),
     );

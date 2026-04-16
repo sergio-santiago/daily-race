@@ -41,13 +41,19 @@ export class DiscordWebhookAdapter implements NotificationPort {
     standings: ChampionshipStanding[],
     racesCount: number,
   ): Promise<void> {
-    const embed = this.formatter.formatChampionshipEmbed(standings, racesCount);
-    if (!embed) return;
-
-    await this.sendWebhook(
-      { username: 'Daily Race', embeds: [embed] },
-      this.championshipWebhook,
+    const embeds = this.formatter.formatChampionshipEmbeds(
+      standings,
+      racesCount,
     );
+    if (embeds.length === 0) return;
+
+    for (let i = 0; i < embeds.length; i++) {
+      await this.sendWebhook(
+        { username: 'Daily Race', embeds: [embeds[i]] },
+        this.championshipWebhook,
+      );
+      if (i < embeds.length - 1) await this.sleep(EMBED_SEND_DELAY_MS);
+    }
   }
 
   async publishTranscript(

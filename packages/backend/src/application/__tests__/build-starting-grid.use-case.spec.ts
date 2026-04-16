@@ -46,7 +46,7 @@ describe('BuildStartingGridUseCase', () => {
     expect(grid[2].driver.displayName).toBe('Charlie');
   });
 
-  it('should mark only the last participant as isLastOnGrid', () => {
+  it('should crown the last participant as king when no false starts', () => {
     const participants = [
       participant('Alice', 1000),
       participant('Bob', 3000),
@@ -60,7 +60,25 @@ describe('BuildStartingGridUseCase', () => {
     expect(grid[2].isLastOnGrid).toBe(true);
   });
 
-  it('should mark early entries as false start with -5 pts', () => {
+  it('should crown the most-early false starter as king when any false start exists', () => {
+    const participants = [
+      participant('EarlyEarly', -30000),
+      participant('Early', -1000),
+      participant('OnTime', 1000),
+      participant('Late', 60000),
+    ];
+
+    const grid = useCase.execute({ participants, greenLight });
+
+    // sorted: EarlyEarly (-30s), Early (-1s), OnTime (+1s), Late (+60s)
+    expect(grid[0].driver.displayName).toBe('EarlyEarly');
+    expect(grid[0].isLastOnGrid).toBe(true);
+    expect(grid[1].isLastOnGrid).toBe(false);
+    expect(grid[2].isLastOnGrid).toBe(false);
+    expect(grid[3].isLastOnGrid).toBe(false);
+  });
+
+  it('should mark early entries as false start with -5 pts and put them last in the ranking', () => {
     const participants = [
       participant('Early', -5000),
       participant('OnTime', 1000),
@@ -70,13 +88,44 @@ describe('BuildStartingGridUseCase', () => {
 
     expect(grid[0].driver.displayName).toBe('Early');
     expect(grid[0].isFalseStart).toBe(true);
-    expect(grid[0].position).toBe(0);
+    // 2 participants total → false starter gets last position (2)
+    expect(grid[0].position).toBe(2);
     expect(grid[0].points).toBe(FALSE_START_PENALTY);
 
     expect(grid[1].driver.displayName).toBe('OnTime');
     expect(grid[1].isFalseStart).toBe(false);
     expect(grid[1].position).toBe(1);
     expect(grid[1].points).toBe(F1_POINTS[0]); // P1 = 25
+  });
+
+  it('should assign last positions to false starters in order of how early they arrived', () => {
+    // 3 false starts + 2 on-time = 5 total. Most-early false starter gets pos 5.
+    const participants = [
+      participant('EarlyEarly', -30000),
+      participant('Early', -10000),
+      participant('Earlyish', -1000),
+      participant('OnTime', 1000),
+      participant('Late', 5000),
+    ];
+
+    const grid = useCase.execute({ participants, greenLight });
+
+    // sorted: EarlyEarly(-30s) Early(-10s) Earlyish(-1s) OnTime(+1s) Late(+5s)
+    expect(grid[0].driver.displayName).toBe('EarlyEarly');
+    expect(grid[0].position).toBe(5); // worst (most early)
+    expect(grid[0].isLastOnGrid).toBe(true);
+
+    expect(grid[1].driver.displayName).toBe('Early');
+    expect(grid[1].position).toBe(4);
+
+    expect(grid[2].driver.displayName).toBe('Earlyish');
+    expect(grid[2].position).toBe(3);
+
+    expect(grid[3].driver.displayName).toBe('OnTime');
+    expect(grid[3].position).toBe(1);
+
+    expect(grid[4].driver.displayName).toBe('Late');
+    expect(grid[4].position).toBe(2);
   });
 
   it('should give flat -5 pts regardless of how early the false start is', () => {
@@ -121,7 +170,7 @@ describe('BuildStartingGridUseCase', () => {
     expect(grid[14].points).toBe(ATTENDANCE_POINTS);
   });
 
-  it('should skip false starts when counting positions', () => {
+  it('should skip false starts when counting top positions', () => {
     const participants = [
       participant('FalseA', -3000),
       participant('FalseB', -1000),
@@ -132,11 +181,11 @@ describe('BuildStartingGridUseCase', () => {
 
     const grid = useCase.execute({ participants, greenLight });
 
-    // Sorted: FalseA, FalseB, P1Real, P2Real, P3Real
+    // Sorted: FalseA, FalseB, P1Real, P2Real, P3Real (5 total)
     expect(grid[0].isFalseStart).toBe(true);
-    expect(grid[0].position).toBe(0);
+    expect(grid[0].position).toBe(5); // most early → last pos
     expect(grid[1].isFalseStart).toBe(true);
-    expect(grid[1].position).toBe(0);
+    expect(grid[1].position).toBe(4);
     expect(grid[2].position).toBe(1);
     expect(grid[2].points).toBe(F1_POINTS[0]); // 25
     expect(grid[3].position).toBe(2);

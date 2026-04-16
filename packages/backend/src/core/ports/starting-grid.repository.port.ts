@@ -10,12 +10,13 @@ export interface StartingGridRepositoryPort {
     start: Date,
     end: Date,
   ): Promise<StartingGridEntry[]>;
-  updatePointsAndPosition(
+  updateEntries(
     updates: Array<{
       raceId: string;
       driverId: string;
       position: number;
       points: number;
+      isLastOnGrid: boolean;
     }>,
   ): Promise<void>;
 }

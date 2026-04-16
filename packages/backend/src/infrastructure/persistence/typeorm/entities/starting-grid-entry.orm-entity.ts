@@ -5,11 +5,13 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
+  Unique,
 } from 'typeorm';
 import { RaceOrmEntity } from './race.orm-entity';
 import { DriverOrmEntity } from './driver.orm-entity';
 
 @Entity('starting_grid_entries')
+@Unique(['raceId', 'driverId'])
 export class StartingGridEntryOrmEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -39,7 +41,7 @@ export class StartingGridEntryOrmEntity {
   @Column({ type: 'timestamptz' })
   greenLight: Date;
 
-  @Column({ type: 'decimal', precision: 12, scale: 6 })
+  @Column({ type: 'integer' })
   points: number;
 
   @Column({ type: 'boolean', default: false })

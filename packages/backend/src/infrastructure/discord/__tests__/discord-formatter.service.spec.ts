@@ -47,38 +47,51 @@ describe('DiscordFormatterService', () => {
   describe('formatRaceEmbeds', () => {
     it('should format a clean race with no false starts', () => {
       const race = makeRace([
-        makeEntry(1, 'Alice', 96.74, 1.0),
-        makeEntry(2, 'Bob', 90.40, 3.0, false, true),
+        makeEntry(1, 'Alice', 25, 1.0),
+        makeEntry(2, 'Bob', 18, 3.0, false, true),
       ]);
 
       const embeds = formatter.formatRaceEmbeds(race);
 
       expect(embeds.length).toBeGreaterThanOrEqual(1);
       expect(embeds[0].title).toContain('DAILY RACE');
-      expect(embeds[0].description).toContain('PARRILLA DE SALIDA');
-      expect(embeds[0].description).not.toContain('SALIDA EN FALSO');
+      expect(embeds[0].description).toContain('Piloto');
       expect(embeds[0].description).toContain('Alice');
       expect(embeds[0].description).toContain('Bob');
     });
 
-    it('should include false start section when present', () => {
+    it('should include false start entries and green light marker', () => {
       const race = makeRace([
-        makeEntry(0, 'Early', -300, -15, true),
-        makeEntry(1, 'OnTime', 96.74, 1.0, false, true),
+        makeEntry(0, 'Early', -5, -15, true, true),
+        makeEntry(1, 'OnTime', 25, 1.0, false, false),
       ]);
 
       const embeds = formatter.formatRaceEmbeds(race);
       const desc = embeds[0].description!;
 
-      expect(desc).toContain('SALIDA EN FALSO');
-      expect(desc).toContain('PARRILLA DE SALIDA');
       expect(desc).toContain('Early');
+      expect(desc).toContain('OnTime');
+      // Green light marker is rendered between false starts and parrilla
+      expect(desc).toMatch(/\d{2}:\d{2}/);
     });
 
-    it('should include stats with green light, winner, and last', () => {
+    it('should include title with date and summary with time + pilot count', () => {
       const race = makeRace([
-        makeEntry(1, 'Winner', 98.0, 0.5),
-        makeEntry(2, 'Last', 50.0, 10.0, false, true),
+        makeEntry(1, 'Winner', 25, 0.5),
+        makeEntry(2, 'Last', 1, 10.0, false, true),
+      ]);
+
+      const embeds = formatter.formatRaceEmbeds(race);
+
+      expect(embeds[0].title).toContain('DAILY RACE');
+      expect(embeds[0].description).toMatch(/\d{2}:\d{2}/);
+      expect(embeds[0].description).toMatch(/\*\*2\*\*\s+pilotos/);
+    });
+
+    it('should include king of ruina in stats', () => {
+      const race = makeRace([
+        makeEntry(1, 'Winner', 25, 0.5),
+        makeEntry(2, 'Last', 1, 10.0, false, true),
       ]);
 
       const embeds = formatter.formatRaceEmbeds(race);
@@ -86,22 +99,20 @@ describe('DiscordFormatterService', () => {
 
       expect(lastEmbed.fields).toHaveLength(1);
       const stats = lastEmbed.fields![0].value;
-      expect(stats).toContain('Green Light');
-      expect(stats).toContain('Winner');
+      expect(stats).toContain('Rey de la Ruina');
       expect(stats).toContain('Last');
-      expect(stats).toContain('2');
     });
 
-    it('should mention false starters in stats', () => {
+    it('should mention false starter count in stats', () => {
       const race = makeRace([
-        makeEntry(0, 'EarlyBird', -100, -5, true),
-        makeEntry(1, 'Normal', 90.0, 3.0, false, true),
+        makeEntry(0, 'EarlyBird', -5, -5, true, true),
+        makeEntry(1, 'Normal', 25, 3.0, false, false),
       ]);
 
       const embeds = formatter.formatRaceEmbeds(race);
       const stats = embeds[embeds.length - 1].fields![0].value;
       expect(stats).toContain('Salida en falso');
-      expect(stats).toContain('EarlyBird');
+      expect(stats).toMatch(/Salida en falso: \*?\*?1\*?\*?/);
     });
 
     it('should have footer and timestamp on last embed', () => {
@@ -115,36 +126,39 @@ describe('DiscordFormatterService', () => {
     });
   });
 
-  describe('formatChampionshipEmbed', () => {
-    it('should return null for empty standings', () => {
-      const result = formatter.formatChampionshipEmbed([], 0);
-      expect(result).toBeNull();
+  describe('formatChampionshipEmbeds', () => {
+    it('should return empty array for empty standings', () => {
+      const result = formatter.formatChampionshipEmbeds([], 0);
+      expect(result).toEqual([]);
     });
 
     it('should format standings with header and rows', () => {
       const standings = [
         new ChampionshipStanding(
           new Driver('d1', 'g1', 'Alice', null),
-          290.5, 3, 0, 1, 1,
+          290, 3, 0, 1, 1,
         ),
         new ChampionshipStanding(
           new Driver('d2', 'g2', 'Bob', null),
-          250.3, 3, 1, 2, 2,
+          250, 3, 1, 2, 2,
         ),
       ];
 
-      const result = formatter.formatChampionshipEmbed(standings, 3);
+      const embeds = formatter.formatChampionshipEmbeds(standings, 3);
 
-      expect(result).not.toBeNull();
-      expect(result!.title).toContain('CHAMPIONSHIP');
-      expect(result!.description).toContain('Piloto');
-      expect(result!.description).toContain('Total');
-      expect(result!.description).toContain('Alice');
-      expect(result!.description).toContain('Bob');
-      expect(result!.color).toBe(0xffd700);
+      expect(embeds.length).toBeGreaterThanOrEqual(1);
+      expect(embeds[0].title).toContain('CHAMPIONSHIP');
+      expect(embeds[0].description).toContain('Piloto');
+      expect(embeds[0].description).toContain('Pts');
+      expect(embeds[0].description).toContain('GP');
+      expect(embeds[0].description).toContain('W');
+      expect(embeds[0].description).toContain('PD');
+      expect(embeds[0].description).toContain('Alice');
+      expect(embeds[0].description).toContain('Bob');
+      expect(embeds[0].color).toBe(0xffd700);
     });
 
-    it('should show leader in stats', () => {
+    it('should show races and driver counts in description summary', () => {
       const standings = [
         new ChampionshipStanding(
           new Driver('d1', 'g1', 'Leader', null),
@@ -152,36 +166,35 @@ describe('DiscordFormatterService', () => {
         ),
       ];
 
-      const result = formatter.formatChampionshipEmbed(standings, 5);
-      const stats = result!.fields![0].value;
+      const embeds = formatter.formatChampionshipEmbeds(standings, 5);
 
-      expect(stats).toContain('L\u00edder');
-      expect(stats).toContain('Leader');
-      expect(stats).toContain('125');
-      expect(stats).toContain('5');
+      expect(embeds[0].description).toMatch(/\*\*5\*\*\s+carreras/);
+      expect(embeds[0].description).toMatch(/\*\*1\*\*\s+piloto/);
+      expect(embeds[0].fields).toBeUndefined();
     });
 
-    it('should use singular for 1 race', () => {
+    it('should use singular for 1 race and 1 piloto', () => {
       const standings = [
         new ChampionshipStanding(
           new Driver('d1', 'g1', 'Solo', null),
-          100.0, 1, 0, 1, 1,
+          100, 1, 0, 1, 1,
         ),
       ];
 
-      const result = formatter.formatChampionshipEmbed(standings, 1);
-      expect(result!.fields![0].value).toContain('Carreras disputadas: **1**');
+      const embeds = formatter.formatChampionshipEmbeds(standings, 1);
+      expect(embeds[0].description).toMatch(/\*\*1\*\*\s+carrera/);
+      expect(embeds[0].description).toMatch(/\*\*1\*\*\s+piloto/);
     });
   });
 
   describe('formatting utilities', () => {
     it('should format positive diff correctly', () => {
-      expect(formatter.formatDiff(5.123).trim()).toBe('+5.123s');
-      expect(formatter.formatDiff(0.5).trim()).toBe('+0.500s');
+      expect(formatter.formatDiff(5.123).trim()).toBe('+5.123');
+      expect(formatter.formatDiff(0.5).trim()).toBe('+0.500');
     });
 
     it('should format negative diff correctly', () => {
-      expect(formatter.formatDiff(-15.5).trim()).toBe('-15.500s');
+      expect(formatter.formatDiff(-15.5).trim()).toBe('-15.500');
     });
 
     it('should format diff over 60s as min:sec', () => {
@@ -190,7 +203,9 @@ describe('DiscordFormatterService', () => {
 
     it('should truncate long names', () => {
       expect(formatter.truncate('Short', 10)).toBe('Short     ');
-      expect(formatter.truncate('Very Long Name Here', 10)).toBe('Very Long.');
+      expect(formatter.truncate('Very Long Name Here', 10)).toBe(
+        'Very Long\u2026',
+      );
     });
 
     it('should assign correct position labels', () => {
@@ -224,6 +239,127 @@ describe('DiscordFormatterService', () => {
       const chunks = formatter.chunkText(text, 200);
       expect(chunks.length).toBeGreaterThan(1);
       chunks.forEach((chunk) => expect(chunk.length).toBeLessThanOrEqual(200));
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should not render green light marker when there are no false starts', () => {
+      const race = makeRace([
+        makeEntry(1, 'Alice', 25, 1.0),
+        makeEntry(2, 'Bob', 18, 2.0, false, true),
+      ]);
+
+      const embeds = formatter.formatRaceEmbeds(race);
+      const desc = embeds[0].description!;
+      // The clock emoji 🚥 is used by the green light marker; it must NOT appear
+      // in the grid body (it IS present in the summary line above the ``` block)
+      const gridBody = desc.split('```')[1] ?? '';
+      expect(gridBody).not.toContain('\u{1F6A5}');
+    });
+
+    it('should render grid even if all entries are false starts', () => {
+      const race = makeRace([
+        makeEntry(2, 'EarlyEarly', -5, -30, true, true),
+        makeEntry(1, 'Early', -5, -5, true, false),
+      ]);
+
+      const embeds = formatter.formatRaceEmbeds(race);
+      const desc = embeds[0].description!;
+      expect(desc).toContain('EarlyEarly');
+      expect(desc).toContain('Early');
+      // Green light marker still renders (falseStarters.length > 0)
+      expect(desc).toContain('\u{1F6A5}');
+    });
+
+    it('should stay within Discord description limit for large championships', () => {
+      // 60 drivers: realistic upper bound for Secture
+      const standings = Array.from(
+        { length: 60 },
+        (_, i) =>
+          new ChampionshipStanding(
+            new Driver(`d${i}`, `g${i}`, `Driver Number ${i}`, null),
+            200 - i * 3,
+            10,
+            0,
+            i + 1,
+            i + 1,
+            i < 5 ? 1 : 0,
+            i < 10 ? 2 : 0,
+          ),
+      );
+
+      const embeds = formatter.formatChampionshipEmbeds(standings, 10);
+
+      expect(embeds.length).toBeGreaterThan(0);
+      embeds.forEach((embed) => {
+        expect(embed.description!.length).toBeLessThanOrEqual(4096);
+      });
+    });
+
+    it('should include legend only on the last embed of a multi-chunk championship', () => {
+      // Force multi-chunk by using many long names
+      const standings = Array.from(
+        { length: 100 },
+        (_, i) =>
+          new ChampionshipStanding(
+            new Driver(
+              `d${i}`,
+              `g${i}`,
+              `Long Driver Name ${i} Extra Padding`,
+              null,
+            ),
+            100,
+            10,
+            0,
+            i + 1,
+            i + 1,
+            0,
+            0,
+          ),
+      );
+
+      const embeds = formatter.formatChampionshipEmbeds(standings, 10);
+      expect(embeds.length).toBeGreaterThan(1);
+
+      // Only the last embed carries the legend
+      const legendText = '**GP** grandes premios';
+      const embedsWithLegend = embeds.filter((e) =>
+        e.description!.includes(legendText),
+      );
+      expect(embedsWithLegend).toHaveLength(1);
+      expect(
+        embeds[embeds.length - 1].description!.includes(legendText),
+      ).toBe(true);
+    });
+
+    it('should include summary only on the first embed of a multi-chunk race', () => {
+      const entries = Array.from({ length: 200 }, (_, i) =>
+        makeEntry(
+          i + 1,
+          `Very Long Driver Name ${i}`,
+          i < 10 ? 25 : 1,
+          i + 0.5,
+        ),
+      );
+      entries[entries.length - 1] = makeEntry(
+        200,
+        'LastDriver',
+        1,
+        199.5,
+        false,
+        true,
+      );
+      const race = makeRace(entries);
+
+      const embeds = formatter.formatRaceEmbeds(race);
+      expect(embeds.length).toBeGreaterThan(1);
+
+      const summaryText = '**200** pilotos';
+      expect(embeds[0].description!).toContain(summaryText);
+      // Following embeds should not repeat the summary
+      for (let i = 1; i < embeds.length; i++) {
+        expect(embeds[i].description!).not.toContain(summaryText);
+      }
     });
   });
 });
