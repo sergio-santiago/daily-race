@@ -16,7 +16,6 @@
     "migration:generate": "npm run typeorm -- migration:generate -d src/infrastructure/persistence/typeorm/data-source.ts",
     "migration:run": "npm run typeorm -- migration:run -d src/infrastructure/persistence/typeorm/data-source.ts",
     "migration:revert": "npm run typeorm -- migration:revert -d src/infrastructure/persistence/typeorm/data-source.ts",
-    "cli:recalculate-points": "node dist/cli/recalculate-points.cli.js",
     "cli:republish-championship": "node dist/cli/republish-championship.cli.js",
     "cli:preview-race-message": "node dist/cli/preview-race-message.cli.js"
   },
