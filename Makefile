@@ -56,9 +56,6 @@ db-shell: ## Abrir consola psql
 
 # ── CLI (operaciones administrativas) ─────────────────────────
 
-cli-recalculate-points: ## Recalcular puntos de todas las races con la formula actual
-	docker compose exec -w /app/packages/backend app npm run cli:recalculate-points
-
 cli-republish-championship: ## Republicar mensaje del championship standings a Discord
 	docker compose exec -w /app/packages/backend app npm run cli:republish-championship
 
