@@ -103,16 +103,16 @@ describe('DiscordFormatterService', () => {
       expect(stats).toContain('Last');
     });
 
-    it('should mention false starter count in stats', () => {
+    it('should mention false starter count in summary', () => {
       const race = makeRace([
         makeEntry(0, 'EarlyBird', -5, -5, true, true),
         makeEntry(1, 'Normal', 25, 3.0, false, false),
       ]);
 
       const embeds = formatter.formatRaceEmbeds(race);
-      const stats = embeds[embeds.length - 1].fields![0].value;
-      expect(stats).toContain('Salida en falso');
-      expect(stats).toMatch(/Salida en falso: \*?\*?1\*?\*?/);
+      const desc = embeds[0].description!;
+      expect(desc).toContain('salida en falso');
+      expect(desc).toMatch(/\*\*1\*\*\s+salida en falso/);
     });
 
     it('should have footer and timestamp on last embed', () => {
@@ -224,14 +224,16 @@ describe('DiscordFormatterService', () => {
       expect(formatter.positionLabel(elast)).toContain('\u{1F451}');
     });
 
-    it('should mark rezagados with turtle emoji', () => {
-      const rezagado = makeEntry(5, 'Slow', 10, 90);
-      expect(formatter.positionLabel(rezagado)).toContain('\u{1F422}');
+    it('should mark rezagados in bottom 10% with turtle emoji', () => {
+      // Position 19 out of 20 clean drivers → in bottom 10%
+      const rezagado = makeEntry(19, 'Slow', 1, 90);
+      expect(formatter.positionLabel(rezagado, 20)).toContain('\u{1F422}');
     });
 
-    it('should not mark normal entries as rezagados', () => {
+    it('should not mark entries outside bottom 10% as rezagados', () => {
+      // Position 5 out of 20 clean drivers → not in bottom 10%
       const normal = makeEntry(5, 'Fast', 90, 3);
-      expect(formatter.positionLabel(normal)).not.toContain('\u{1F422}');
+      expect(formatter.positionLabel(normal, 20)).not.toContain('\u{1F422}');
     });
 
     it('should chunk text correctly', () => {
@@ -243,7 +245,7 @@ describe('DiscordFormatterService', () => {
   });
 
   describe('edge cases', () => {
-    it('should not render green light marker when there are no false starts', () => {
+    it('should always render green light marker in grid', () => {
       const race = makeRace([
         makeEntry(1, 'Alice', 25, 1.0),
         makeEntry(2, 'Bob', 18, 2.0, false, true),
@@ -251,10 +253,8 @@ describe('DiscordFormatterService', () => {
 
       const embeds = formatter.formatRaceEmbeds(race);
       const desc = embeds[0].description!;
-      // The clock emoji 🚥 is used by the green light marker; it must NOT appear
-      // in the grid body (it IS present in the summary line above the ``` block)
       const gridBody = desc.split('```')[1] ?? '';
-      expect(gridBody).not.toContain('\u{1F6A5}');
+      expect(gridBody).toContain('\u{1F6A5}');
     });
 
     it('should render grid even if all entries are false starts', () => {
