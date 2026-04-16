@@ -62,6 +62,9 @@ cli-recalculate-points: ## Recalcular puntos de todas las races con la formula a
 cli-republish-championship: ## Republicar mensaje del championship standings a Discord
 	docker compose exec -w /app/packages/backend app npm run cli:republish-championship
 
+cli-preview-race-message: ## Publicar mensaje de race a Discord (uso: make cli-preview-race-message RACE_ID=<uuid>)
+	docker compose exec -w /app/packages/backend app node dist/cli/preview-race-message.cli.js $(RACE_ID)
+
 # ── Utilidades ────────────────────────────────────────────────
 
 clean: ## Eliminar contenedores, volumenes e imagenes

@@ -44,7 +44,7 @@ describe('GetChampionshipStandingsUseCase', () => {
       saveAll: jest.fn(),
       findByRaceId: jest.fn(),
       findByDriverInDateRange: jest.fn(),
-      updatePointsAndPosition: jest.fn(),
+      updateEntries: jest.fn(),
     };
 
     const module = await Test.createTestingModule({
@@ -84,14 +84,16 @@ describe('GetChampionshipStandingsUseCase', () => {
     expect(result[1].rank).toBe(2);
   });
 
-  it('should ignore position=0 (false starts) when calculating bestFinish', async () => {
+  it('should ignore false starts when calculating bestFinish', async () => {
+    // False starters get last positions in the new model (e.g. pos 18 for 18
+    // total with 1 false start). bestFinish must look only at clean entries.
     const driver = new Driver('d1', 'g1', 'Racer', null);
 
     driverRepository.findAll.mockResolvedValue([driver]);
     gridRepository.findByDriverInDateRange.mockResolvedValue([
-      makeEntry(0, -100, true),
-      makeEntry(5, 70),
-      makeEntry(2, 90),
+      makeEntry(18, -5, true),
+      makeEntry(5, 10),
+      makeEntry(2, 18),
     ]);
 
     const result = await useCase.execute();
@@ -105,15 +107,17 @@ describe('GetChampionshipStandingsUseCase', () => {
 
     driverRepository.findAll.mockResolvedValue([driver]);
     gridRepository.findByDriverInDateRange.mockResolvedValue([
-      makeEntry(0, -200, true),
-      makeEntry(0, -100, true),
+      makeEntry(20, -5, true),
+      makeEntry(15, -5, true),
     ]);
 
     const result = await useCase.execute();
 
     expect(result[0].bestFinish).toBe(0);
     expect(result[0].falseStarts).toBe(2);
-    expect(result[0].totalPoints).toBe(-300);
+    expect(result[0].totalPoints).toBe(-10);
+    expect(result[0].wins).toBe(0);
+    expect(result[0].podiums).toBe(0);
   });
 
   it('should count races attended correctly', async () => {
@@ -121,13 +125,65 @@ describe('GetChampionshipStandingsUseCase', () => {
 
     driverRepository.findAll.mockResolvedValue([driver]);
     gridRepository.findByDriverInDateRange.mockResolvedValue([
-      makeEntry(1, 95),
-      makeEntry(3, 80),
-      makeEntry(10, 40),
+      makeEntry(1, 25),
+      makeEntry(3, 15),
+      makeEntry(10, 1),
     ]);
 
     const result = await useCase.execute();
 
     expect(result[0].racesAttended).toBe(3);
+  });
+
+  it('should count wins (P1 finishes)', async () => {
+    const driver = new Driver('d1', 'g1', 'Winner', null);
+
+    driverRepository.findAll.mockResolvedValue([driver]);
+    gridRepository.findByDriverInDateRange.mockResolvedValue([
+      makeEntry(1, 25),
+      makeEntry(1, 25),
+      makeEntry(3, 15),
+      makeEntry(4, 12),
+    ]);
+
+    const result = await useCase.execute();
+
+    expect(result[0].wins).toBe(2);
+  });
+
+  it('should count podiums (P1, P2 or P3 finishes)', async () => {
+    const driver = new Driver('d1', 'g1', 'Podium', null);
+
+    driverRepository.findAll.mockResolvedValue([driver]);
+    gridRepository.findByDriverInDateRange.mockResolvedValue([
+      makeEntry(1, 25),
+      makeEntry(2, 18),
+      makeEntry(3, 15),
+      makeEntry(4, 12),
+      makeEntry(10, 1),
+    ]);
+
+    const result = await useCase.execute();
+
+    expect(result[0].podiums).toBe(3);
+    expect(result[0].wins).toBe(1);
+  });
+
+  it('should not count false starts in wins or podiums even if position <= 3', async () => {
+    // Defensive: BuildStartingGrid never assigns P1-3 to false starts, but
+    // cleanEntries filter uses isFalseStart to be safe.
+    const driver = new Driver('d1', 'g1', 'Defensive', null);
+
+    driverRepository.findAll.mockResolvedValue([driver]);
+    gridRepository.findByDriverInDateRange.mockResolvedValue([
+      makeEntry(1, -5, true), // imposible en prod, pero defensive
+      makeEntry(2, -5, true),
+      makeEntry(5, 10),
+    ]);
+
+    const result = await useCase.execute();
+
+    expect(result[0].wins).toBe(0);
+    expect(result[0].podiums).toBe(0);
   });
 });

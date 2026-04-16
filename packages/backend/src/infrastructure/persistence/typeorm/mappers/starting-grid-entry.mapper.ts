@@ -14,7 +14,7 @@ export class StartingGridEntryMapper {
       ),
       orm.startTime,
       orm.greenLight,
-      Number(orm.points),
+      orm.points,
       orm.isFalseStart,
       orm.isLastOnGrid,
     );

@@ -8,5 +8,7 @@ export class ChampionshipStanding {
     public readonly falseStarts: number,
     public readonly bestFinish: number,
     public readonly rank: number,
+    public readonly wins: number = 0,
+    public readonly podiums: number = 0,
   ) {}
 }

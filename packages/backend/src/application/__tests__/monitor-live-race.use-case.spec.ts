@@ -92,7 +92,7 @@ describe('MonitorLiveRaceUseCase', () => {
       saveAll: jest.fn(),
       findByRaceId: jest.fn(),
       findByDriverInDateRange: jest.fn(),
-      updatePointsAndPosition: jest.fn(),
+      updateEntries: jest.fn(),
     };
     notification = {
       publishRaceResults: jest.fn(),
