@@ -16,7 +16,7 @@ export class StartingGridEntryMapper {
       orm.greenLight,
       orm.points,
       orm.isFalseStart,
-      orm.isLastOnGrid,
+      orm.isWorstOnGrid,
     );
   }
 
@@ -32,7 +32,7 @@ export class StartingGridEntryMapper {
       greenLight: domain.greenLight,
       points: domain.points,
       isFalseStart: domain.isFalseStart,
-      isLastOnGrid: domain.isLastOnGrid,
+      isWorstOnGrid: domain.isWorstOnGrid,
     };
   }
 }

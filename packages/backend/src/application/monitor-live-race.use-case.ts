@@ -258,7 +258,7 @@ export class MonitorLiveRaceUseCase {
           entry.greenLight,
           entry.points,
           entry.isFalseStart,
-          entry.isLastOnGrid,
+          entry.isWorstOnGrid,
         );
       }),
     );

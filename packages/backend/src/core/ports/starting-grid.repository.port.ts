@@ -16,7 +16,7 @@ export interface StartingGridRepositoryPort {
       driverId: string;
       position: number;
       points: number;
-      isLastOnGrid: boolean;
+      isWorstOnGrid: boolean;
     }>,
   ): Promise<void>;
 }

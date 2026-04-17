@@ -48,5 +48,5 @@ export class StartingGridEntryOrmEntity {
   isFalseStart: boolean;
 
   @Column({ type: 'boolean', default: false })
-  isLastOnGrid: boolean;
+  isWorstOnGrid: boolean;
 }

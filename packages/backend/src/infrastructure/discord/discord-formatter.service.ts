@@ -17,7 +17,7 @@ const DESCRIPTION_CHUNK_LIMIT = 3800;
 // Column widths (aligned for monospace rendering in Discord code blocks).
 // Emojis in positionLabel count as 2 visual cells but 1 string char, so the
 // position column uses a string width of 4 that renders as 4 visual cells
-// for numeric labels ("10  ") and ~4 for emoji labels (" 1🏆", "18👑").
+// for numeric labels ("10  ") and ~4 for emoji labels (" 1🏆", "18💀").
 const COL_POS = 4;
 const COL_NAME = 24;
 const COL_GAP = '  ';
@@ -171,10 +171,10 @@ export class DiscordFormatterService {
   }
 
   private buildLiveStats(grid: StartingGridEntry[]): string {
-    const kingOfRuina = grid.find((e) => e.isLastOnGrid);
-    if (!kingOfRuina) return '';
+    const busted = grid.find((e) => e.isWorstOnGrid);
+    if (!busted) return '';
 
-    return `\u{1F451}  Rey de la Ruina: **${kingOfRuina.driver.displayName}** (${this.formatDiff(kingOfRuina.diffSeconds).trim()})`;
+    return `\u{1F480}  Busted: **${busted.driver.displayName}** (${this.formatDiff(busted.diffSeconds).trim()})`;
   }
 
   // ── Grid building ──────────────────────────────────────────
@@ -183,7 +183,7 @@ export class DiscordFormatterService {
     grid: StartingGridEntry[],
     greenLight: Date,
   ): string {
-    // False starters: peor posicion primero (Rey con corona arriba)
+    // False starters: peor posicion primero (Busted con calavera arriba)
     const falseStarters = grid
       .filter((e) => e.isFalseStart)
       .sort((a, b) => b.position - a.position);
@@ -275,10 +275,10 @@ export class DiscordFormatterService {
   // ── Stats building ─────────────────────────────────────────
 
   private buildRaceStats(race: Race): string {
-    const kingOfRuina = race.startingGrid.find((e) => e.isLastOnGrid);
-    if (!kingOfRuina) return '';
+    const busted = race.startingGrid.find((e) => e.isWorstOnGrid);
+    if (!busted) return '';
 
-    return `\u{1F451}  Rey de la Ruina: **${kingOfRuina.driver.displayName}** (${this.formatDiff(kingOfRuina.diffSeconds).trim()})`;
+    return `\u{1F480}  Busted: **${busted.driver.displayName}** (${this.formatDiff(busted.diffSeconds).trim()})`;
   }
 
   // ── Row formatting ─────────────────────────────────────────
@@ -299,14 +299,14 @@ export class DiscordFormatterService {
     const numStr = String(entry.position).padStart(2);
 
     if (entry.isFalseStart) {
-      return numStr + (entry.isLastOnGrid ? '\u{1F451}' : '\u{26D4}');
+      return numStr + (entry.isWorstOnGrid ? '\u{1F480}' : '\u{26D4}');
     }
 
     const n = entry.position;
     if (n === 1) return ' 1\u{1F3C6}';
     if (n === 2) return ' 2\u{1F948}';
     if (n === 3) return ' 3\u{1F949}';
-    if (entry.isLastOnGrid) return numStr + '\u{1F451}';
+    if (entry.isWorstOnGrid) return numStr + '\u{1F480}';
     if (
       cleanGridSize &&
       n > cleanGridSize - Math.floor(cleanGridSize * REZAGADO_RATIO)

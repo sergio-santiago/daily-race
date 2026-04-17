@@ -143,7 +143,7 @@ export class ProcessRaceUseCase {
           entry.greenLight,
           entry.points,
           entry.isFalseStart,
-          entry.isLastOnGrid,
+          entry.isWorstOnGrid,
         );
       }),
     );
