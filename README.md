@@ -41,12 +41,12 @@ Si entras a la reunion **antes de la hora programada** (green light), el sistema
 - Ejemplo: si hay 18 participantes y 3 entran antes de hora, estos ocuparan las posiciones 18, 17 y 16 (el mas madrugador en P18)
 - Las salidas en falso NO cuentan para victorias ni podios en el championship
 
-### Rey de la Ruina
+### Busted
 
-Cada carrera tiene un **Rey de la Ruina** (marcado con corona en Discord):
+Cada carrera tiene un **Busted** (marcado con calavera 💀 en Discord):
 
-- **Si hay salidas en falso**: el que entro mas temprano (el mas alejado del green light) se lleva la corona
-- **Si NO hay salidas en falso**: el ultimo en entrar se lleva la corona
+- **Si hay salidas en falso**: el que entro mas temprano (el mas alejado del green light) se lleva la calavera
+- **Si NO hay salidas en falso**: el ultimo en entrar se lleva la calavera
 
 ### Championship (clasificacion general)
 
@@ -77,7 +77,7 @@ Solo detecta reuniones que empezaron dentro de **±30 minutos** de la hora progr
 
 Dos canales con webhooks independientes:
 
-- **#race-day**: grid de cada carrera con posiciones, puntos, tiempos y Rey de la Ruina
+- **#race-day**: grid de cada carrera con posiciones, puntos, tiempos y Busted
 - **#championship**: clasificacion general acumulada
 
 Todo se publica automaticamente al finalizar cada carrera.
@@ -94,7 +94,7 @@ El codigo usa terminologia de carreras/F1:
 | Ranking de entrada   | StartingGrid      | Parrilla de salida              |
 | Entrar antes de hora | FalseStart        | Salida en falso                 |
 | Ganador (P1)         | PolePosition      | Primera posicion en la parrilla |
-| Ultimo en entrar     | LastOnGrid        | Rey/Reina de la ruina           |
+| Peor entrada         | WorstOnGrid       | Busted                          |
 | Ranking acumulado    | Championship      | Clasificacion general           |
 
 ## Prerrequisitos
@@ -151,7 +151,7 @@ El backend incluye un **scheduler (cron)** que monitoriza la daily **en tiempo r
   1. Detecta el meeting activo y crea un mensaje **en directo** en **#race-day** (Discord)
   2. Cada 5 segundos comprueba si hay nuevos participantes
   3. Si alguien nuevo entra, recalcula la parrilla y **edita el mismo mensaje** con el grid actualizado
-  4. El mensaje muestra posiciones, puntos y el Rey de la Ruina en tiempo real
+  4. El mensaje muestra posiciones, puntos y el Busted en tiempo real
 - **Al terminar la reunion** (la sala se vacia):
   1. Persiste los datos en PostgreSQL (drivers, race, starting grid)
   2. Edita el mensaje live al **formato final** (de "EN DIRECTO" a resultado definitivo)
@@ -212,7 +212,7 @@ PostgreSQL con 3 tablas:
 
 - **drivers**: id, google_id, display_name, email, created_at, updated_at
 - **races**: id, conference_record_name, meeting_code, green_light, end_time, status, processed_at, created_at
-- **starting_grid_entries**: id, race_id, driver_id, position, start_time, green_light, points, is_false_start, is_last_on_grid
+- **starting_grid_entries**: id, race_id, driver_id, position, start_time, green_light, points, is_false_start, is_worst_on_grid
 
 Las migraciones se ejecutan automaticamente al arrancar la aplicacion (`migrationsRun: true`).
 
@@ -220,7 +220,7 @@ Las migraciones se ejecutan automaticamente al arrancar la aplicacion (`migratio
 
 Los mensajes se formatean como tablas monospace dentro de embeds de Discord:
 
-- **Race**: columnas Pos, Piloto, Pts, Tiempo. Emojis para podio, salidas en falso y Rey de la Ruina
+- **Race**: columnas Pos, Piloto, Pts, Tiempo. Emojis para podio, salidas en falso y Busted
 - **Championship**: columnas Pos, Piloto, Pts, GP, W, PD. Leyenda al pie
 - **Live**: mismo formato que race pero con color rojo y footer "EN DIRECTO"
 

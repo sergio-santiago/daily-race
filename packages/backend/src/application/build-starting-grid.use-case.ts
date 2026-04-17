@@ -21,12 +21,12 @@ export class BuildStartingGridUseCase {
         a.earliestStartTime.getTime() - b.earliestStartTime.getTime(),
     );
 
-    // Rey de la Ruina: el mas adelantado si hay false starts, sino el ultimo
+    // Busted: el mas adelantado si hay false starts, sino el ultimo
     // (sorted ascending: [0] = more negative if any false start, [last] = latest)
     const hasFalseStart =
       sorted.length > 0 &&
       sorted[0].earliestStartTime.getTime() < greenLight.getTime();
-    const kingIndex = hasFalseStart ? 0 : sorted.length - 1;
+    const bustedIndex = hasFalseStart ? 0 : sorted.length - 1;
 
     // False starters get the last positions in the ranking (the more early the
     // entry, the worse the position). For 4 false starts + 14 on-time:
@@ -69,7 +69,7 @@ export class BuildStartingGridUseCase {
         greenLight,
         points,
         isFalseStart,
-        index === kingIndex,
+        index === bustedIndex,
       );
     });
   }

@@ -8,7 +8,7 @@ export class StartingGridEntry {
     public readonly greenLight: Date,
     public readonly points: number,
     public readonly isFalseStart: boolean,
-    public readonly isLastOnGrid: boolean,
+    public readonly isWorstOnGrid: boolean,
   ) {}
 
   get diffSeconds(): number {

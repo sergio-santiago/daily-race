@@ -56,7 +56,7 @@ export class StartingGridTypeOrmRepository
       driverId: string;
       position: number;
       points: number;
-      isLastOnGrid: boolean;
+      isWorstOnGrid: boolean;
     }>,
   ): Promise<void> {
     await Promise.all(
@@ -66,7 +66,7 @@ export class StartingGridTypeOrmRepository
           {
             position: u.position,
             points: u.points,
-            isLastOnGrid: u.isLastOnGrid,
+            isWorstOnGrid: u.isWorstOnGrid,
           },
         ),
       ),

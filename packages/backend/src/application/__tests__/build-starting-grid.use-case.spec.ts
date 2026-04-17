@@ -46,7 +46,7 @@ describe('BuildStartingGridUseCase', () => {
     expect(grid[2].driver.displayName).toBe('Charlie');
   });
 
-  it('should crown the last participant as king when no false starts', () => {
+  it('should mark the last participant as busted when no false starts', () => {
     const participants = [
       participant('Alice', 1000),
       participant('Bob', 3000),
@@ -55,12 +55,12 @@ describe('BuildStartingGridUseCase', () => {
 
     const grid = useCase.execute({ participants, greenLight });
 
-    expect(grid[0].isLastOnGrid).toBe(false);
-    expect(grid[1].isLastOnGrid).toBe(false);
-    expect(grid[2].isLastOnGrid).toBe(true);
+    expect(grid[0].isWorstOnGrid).toBe(false);
+    expect(grid[1].isWorstOnGrid).toBe(false);
+    expect(grid[2].isWorstOnGrid).toBe(true);
   });
 
-  it('should crown the most-early false starter as king when any false start exists', () => {
+  it('should mark the most-early false starter as busted when any false start exists', () => {
     const participants = [
       participant('EarlyEarly', -30000),
       participant('Early', -1000),
@@ -72,10 +72,10 @@ describe('BuildStartingGridUseCase', () => {
 
     // sorted: EarlyEarly (-30s), Early (-1s), OnTime (+1s), Late (+60s)
     expect(grid[0].driver.displayName).toBe('EarlyEarly');
-    expect(grid[0].isLastOnGrid).toBe(true);
-    expect(grid[1].isLastOnGrid).toBe(false);
-    expect(grid[2].isLastOnGrid).toBe(false);
-    expect(grid[3].isLastOnGrid).toBe(false);
+    expect(grid[0].isWorstOnGrid).toBe(true);
+    expect(grid[1].isWorstOnGrid).toBe(false);
+    expect(grid[2].isWorstOnGrid).toBe(false);
+    expect(grid[3].isWorstOnGrid).toBe(false);
   });
 
   it('should mark early entries as false start with -5 pts and put them last in the ranking', () => {
@@ -113,7 +113,7 @@ describe('BuildStartingGridUseCase', () => {
     // sorted: EarlyEarly(-30s) Early(-10s) Earlyish(-1s) OnTime(+1s) Late(+5s)
     expect(grid[0].driver.displayName).toBe('EarlyEarly');
     expect(grid[0].position).toBe(5); // worst (most early)
-    expect(grid[0].isLastOnGrid).toBe(true);
+    expect(grid[0].isWorstOnGrid).toBe(true);
 
     expect(grid[1].driver.displayName).toBe('Early');
     expect(grid[1].position).toBe(4);
@@ -201,7 +201,7 @@ describe('BuildStartingGridUseCase', () => {
 
     expect(grid).toHaveLength(1);
     expect(grid[0].position).toBe(1);
-    expect(grid[0].isLastOnGrid).toBe(true);
+    expect(grid[0].isWorstOnGrid).toBe(true);
     expect(grid[0].points).toBe(F1_POINTS[0]);
   });
 

@@ -21,7 +21,7 @@ export class RaceMapper {
             entry.greenLight,
             Number(entry.points),
             entry.isFalseStart,
-            entry.isLastOnGrid,
+            entry.isWorstOnGrid,
           ),
       );
 

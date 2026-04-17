@@ -10,7 +10,7 @@ function makeEntry(
   points: number,
   diffSeconds: number,
   isFalseStart = false,
-  isLastOnGrid = false,
+  isWorstOnGrid = false,
 ): StartingGridEntry {
   const gl = new Date('2026-03-27T09:00:00Z');
   return new StartingGridEntry(
@@ -20,7 +20,7 @@ function makeEntry(
     gl,
     points,
     isFalseStart,
-    isLastOnGrid,
+    isWorstOnGrid,
   );
 }
 
@@ -88,7 +88,7 @@ describe('DiscordFormatterService', () => {
       expect(embeds[0].description).toMatch(/\*\*2\*\*\s+pilotos/);
     });
 
-    it('should include king of ruina in stats', () => {
+    it('should include busted in stats', () => {
       const race = makeRace([
         makeEntry(1, 'Winner', 25, 0.5),
         makeEntry(2, 'Last', 1, 10.0, false, true),
@@ -99,7 +99,7 @@ describe('DiscordFormatterService', () => {
 
       expect(lastEmbed.fields).toHaveLength(1);
       const stats = lastEmbed.fields![0].value;
-      expect(stats).toContain('Rey de la Ruina');
+      expect(stats).toContain('Busted');
       expect(stats).toContain('Last');
     });
 
@@ -221,7 +221,7 @@ describe('DiscordFormatterService', () => {
       expect(formatter.positionLabel(e3)).toContain('\u{1F949}');
       expect(formatter.positionLabel(e4)).toContain('4');
       expect(formatter.positionLabel(efs)).toContain('\u{26D4}');
-      expect(formatter.positionLabel(elast)).toContain('\u{1F451}');
+      expect(formatter.positionLabel(elast)).toContain('\u{1F480}');
     });
 
     it('should mark rezagados in bottom 10% with turtle emoji', () => {
