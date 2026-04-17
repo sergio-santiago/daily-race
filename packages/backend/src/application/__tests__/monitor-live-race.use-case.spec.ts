@@ -33,7 +33,6 @@ import {
   NOTIFICATION_PORT,
   NotificationPort,
 } from '../../core/ports/notification.port';
-import { TRANSCRIPT_REPOSITORY } from '../../core/ports/transcript.repository.port';
 
 function mockCalendarEvent(): CalendarEventData {
   return {
@@ -72,7 +71,6 @@ describe('MonitorLiveRaceUseCase', () => {
     meetProvider = {
       getConferenceRecords: jest.fn(),
       getParticipants: jest.fn(),
-      getTranscriptEntries: jest.fn().mockResolvedValue([]),
     };
     raceRepository = {
       save: jest.fn(),
@@ -97,7 +95,6 @@ describe('MonitorLiveRaceUseCase', () => {
     notification = {
       publishRaceResults: jest.fn(),
       publishChampionshipStandings: jest.fn(),
-      publishTranscript: jest.fn(),
       createLiveRaceMessage: jest.fn().mockResolvedValue('msg-123'),
       editLiveRaceMessage: jest.fn(),
       editLiveRaceMessageAsFinal: jest.fn(),
@@ -127,7 +124,6 @@ describe('MonitorLiveRaceUseCase', () => {
         { provide: DRIVER_REPOSITORY, useValue: driverRepository },
         { provide: STARTING_GRID_REPOSITORY, useValue: gridRepository },
         { provide: NOTIFICATION_PORT, useValue: notification },
-        { provide: TRANSCRIPT_REPOSITORY, useValue: { saveAll: jest.fn() } },
         { provide: ConfigService, useValue: { get: () => 'wye-iwfu-jch' } },
       ],
     }).compile();

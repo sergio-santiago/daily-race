@@ -9,7 +9,6 @@ import { SchedulerModule } from './infrastructure/scheduler/scheduler.module';
 import { RaceOrmEntity } from './infrastructure/persistence/typeorm/entities/race.orm-entity';
 import { DriverOrmEntity } from './infrastructure/persistence/typeorm/entities/driver.orm-entity';
 import { StartingGridEntryOrmEntity } from './infrastructure/persistence/typeorm/entities/starting-grid-entry.orm-entity';
-import { TranscriptEntryOrmEntity } from './infrastructure/persistence/typeorm/entities/transcript-entry.orm-entity';
 
 @Module({
   imports: [
@@ -23,7 +22,7 @@ import { TranscriptEntryOrmEntity } from './infrastructure/persistence/typeorm/e
         username: config.get('POSTGRES_USER', 'dailyrace'),
         password: config.get('POSTGRES_PASSWORD', 'dailyrace_dev'),
         database: config.get('POSTGRES_DB', 'dailyrace'),
-        entities: [RaceOrmEntity, DriverOrmEntity, StartingGridEntryOrmEntity, TranscriptEntryOrmEntity],
+        entities: [RaceOrmEntity, DriverOrmEntity, StartingGridEntryOrmEntity],
         namingStrategy: new SnakeNamingStrategy(),
         synchronize: false,
         migrationsRun: true,

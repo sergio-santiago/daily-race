@@ -14,13 +14,6 @@ export interface ConferenceRecordData {
   endTime: Date | null;
 }
 
-export interface MeetTranscriptEntryData {
-  speakerName: string;
-  text: string;
-  startTime: Date;
-  endTime: Date;
-}
-
 export interface MeetConferenceProvider {
   getConferenceRecords(
     meetingCode: string,
@@ -34,13 +27,6 @@ export interface MeetParticipantProvider {
   ): Promise<MeetParticipantData[]>;
 }
 
-export interface MeetTranscriptProvider {
-  getTranscriptEntries(
-    conferenceRecordName: string,
-  ): Promise<MeetTranscriptEntryData[]>;
-}
-
 export interface MeetProviderPort
   extends MeetConferenceProvider,
-    MeetParticipantProvider,
-    MeetTranscriptProvider {}
+    MeetParticipantProvider {}

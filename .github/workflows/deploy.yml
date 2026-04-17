@@ -101,7 +101,6 @@ jobs:
           DAILY_MEETING_CODE=${{ vars.DAILY_MEETING_CODE }}
           DISCORD_WEBHOOK_RACE_DAY=${{ secrets.DISCORD_WEBHOOK_RACE_DAY }}
           DISCORD_WEBHOOK_CHAMPIONSHIP=${{ secrets.DISCORD_WEBHOOK_CHAMPIONSHIP }}
-          DISCORD_WEBHOOK_RUINOTECA=${{ secrets.DISCORD_WEBHOOK_RUINOTECA }}
           TZ=${{ vars.TZ }}
           EOL
           sed -i 's/^[[:space:]]*//' .env

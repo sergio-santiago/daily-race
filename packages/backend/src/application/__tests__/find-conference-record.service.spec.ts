@@ -34,7 +34,6 @@ describe('FindConferenceRecordService', () => {
     meetProvider = {
       getConferenceRecords: jest.fn(),
       getParticipants: jest.fn(),
-      getTranscriptEntries: jest.fn(),
     };
 
     const module = await Test.createTestingModule({
