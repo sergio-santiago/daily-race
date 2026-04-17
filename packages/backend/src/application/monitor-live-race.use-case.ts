@@ -23,11 +23,6 @@ import {
   NOTIFICATION_PORT,
   NotificationPort,
 } from '../core/ports/notification.port';
-import {
-  TRANSCRIPT_REPOSITORY,
-  TranscriptRepositoryPort,
-  TranscriptEntryData,
-} from '../core/ports/transcript.repository.port';
 import { Race, RaceStatus } from '../core/entities/race.entity';
 import { StartingGridEntry } from '../core/entities/starting-grid-entry.entity';
 import { BuildStartingGridUseCase } from './build-starting-grid.use-case';
@@ -63,8 +58,6 @@ export class MonitorLiveRaceUseCase {
     private readonly startingGridRepository: StartingGridRepositoryPort,
     @Inject(NOTIFICATION_PORT)
     private readonly notification: NotificationPort,
-    @Inject(TRANSCRIPT_REPOSITORY)
-    private readonly transcriptRepository: TranscriptRepositoryPort,
     private readonly buildStartingGrid: BuildStartingGridUseCase,
     private readonly getChampionship: GetChampionshipStandingsUseCase,
     private readonly findConferenceRecord: FindConferenceRecordService,
@@ -234,12 +227,6 @@ export class MonitorLiveRaceUseCase {
         race,
       );
 
-      const transcriptEntries = await this.saveTranscripts(
-        record.name,
-        savedRace.id,
-      );
-      await this.notification.publishTranscript(race, transcriptEntries);
-
       const standings = await this.getChampionship.execute();
       const allRaces = await this.raceRepository.findByDateRange(
         ALL_TIME_START,
@@ -275,26 +262,5 @@ export class MonitorLiveRaceUseCase {
         );
       }),
     );
-  }
-
-  private async saveTranscripts(
-    conferenceRecordName: string,
-    raceId: string,
-  ): Promise<TranscriptEntryData[]> {
-    try {
-      const entries = await this.meetProvider.getTranscriptEntries(
-        conferenceRecordName,
-      );
-      if (entries.length > 0) {
-        await this.transcriptRepository.saveAll(raceId, entries);
-        this.logger.log(`Saved ${entries.length} transcript entries`);
-      }
-      return entries;
-    } catch (error) {
-      this.logger.error(
-        `Failed to save transcripts for race ${raceId}: ${error}`,
-      );
-      return [];
-    }
   }
 }

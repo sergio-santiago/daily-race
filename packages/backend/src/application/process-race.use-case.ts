@@ -23,11 +23,6 @@ import {
   NOTIFICATION_PORT,
   NotificationPort,
 } from '../core/ports/notification.port';
-import {
-  TRANSCRIPT_REPOSITORY,
-  TranscriptRepositoryPort,
-  TranscriptEntryData,
-} from '../core/ports/transcript.repository.port';
 import { Race, RaceStatus } from '../core/entities/race.entity';
 import { StartingGridEntry } from '../core/entities/starting-grid-entry.entity';
 import { BuildStartingGridUseCase } from './build-starting-grid.use-case';
@@ -54,8 +49,6 @@ export class ProcessRaceUseCase {
     private readonly startingGridRepository: StartingGridRepositoryPort,
     @Inject(NOTIFICATION_PORT)
     private readonly notification: NotificationPort,
-    @Inject(TRANSCRIPT_REPOSITORY)
-    private readonly transcriptRepository: TranscriptRepositoryPort,
     private readonly buildStartingGrid: BuildStartingGridUseCase,
     private readonly getChampionship: GetChampionshipStandingsUseCase,
     private readonly findConferenceRecord: FindConferenceRecordService,
@@ -92,8 +85,7 @@ export class ProcessRaceUseCase {
 
     const race = await this.buildAndSaveRace(calendarEvent, record, participants);
 
-    const transcriptEntries = await this.saveTranscripts(record.name, race.id);
-    await this.publishResults(race, transcriptEntries);
+    await this.publishResults(race);
 
     this.logger.log(
       `Race processed: ${race.startingGrid.length} drivers, P1: ${race.startingGrid[0]?.driver.displayName}`,
@@ -157,31 +149,8 @@ export class ProcessRaceUseCase {
     );
   }
 
-  private async saveTranscripts(
-    conferenceRecordName: string,
-    raceId: string,
-  ): Promise<TranscriptEntryData[]> {
-    try {
-      const entries = await this.meetProvider.getTranscriptEntries(
-        conferenceRecordName,
-      );
-      if (entries.length > 0) {
-        await this.transcriptRepository.saveAll(raceId, entries);
-        this.logger.log(`Saved ${entries.length} transcript entries`);
-      }
-      return entries;
-    } catch (error) {
-      this.logger.error(`Failed to save transcripts for race ${raceId}: ${error}`);
-      return [];
-    }
-  }
-
-  private async publishResults(
-    race: Race,
-    transcriptEntries: TranscriptEntryData[],
-  ): Promise<void> {
+  private async publishResults(race: Race): Promise<void> {
     await this.notification.publishRaceResults(race);
-    await this.notification.publishTranscript(race, transcriptEntries);
 
     const standings = await this.getChampionship.execute();
     const allRaces = await this.raceRepository.findByDateRange(

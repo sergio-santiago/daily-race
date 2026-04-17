@@ -208,12 +208,11 @@ El cambio entre modos es transparente — el `GoogleModule` inyecta el adaptador
 
 ### Base de datos
 
-PostgreSQL con 4 tablas:
+PostgreSQL con 3 tablas:
 
 - **drivers**: id, google_id, display_name, email, created_at, updated_at
 - **races**: id, conference_record_name, meeting_code, green_light, end_time, status, processed_at, created_at
 - **starting_grid_entries**: id, race_id, driver_id, position, start_time, green_light, points, is_false_start, is_last_on_grid
-- **transcript_entries**: id, race_id, speaker_name, text, start_time, end_time, created_at
 
 Las migraciones se ejecutan automaticamente al arrancar la aplicacion (`migrationsRun: true`).
 
@@ -295,7 +294,3 @@ El deploy genera un tag semantico automatico desde los mensajes de commit y publ
 - **Contenedores**: Docker (multi-stage) + Docker Compose
 - **Testing**: Jest (91 tests)
 - **CI/CD**: GitHub Actions + GHCR + SSH deploy
-
-## Documentacion adicional
-
-- [Transcripciones](docs/transcripts.md) — diseño previsto para captura y publicacion de transcripts (pendiente de implementar)
