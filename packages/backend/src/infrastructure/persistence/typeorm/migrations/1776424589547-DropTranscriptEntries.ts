@@ -4,7 +4,7 @@ export class DropTranscriptEntries1776424589547 implements MigrationInterface {
     name = 'DropTranscriptEntries1776424589547'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE "transcript_entries" DROP CONSTRAINT IF EXISTS "FK_c42b714bf6ca201fa018b65c708"`);
+        await queryRunner.query(`ALTER TABLE IF EXISTS "transcript_entries" DROP CONSTRAINT IF EXISTS "FK_c42b714bf6ca201fa018b65c708"`);
         await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_c42b714bf6ca201fa018b65c70"`);
         await queryRunner.query(`DROP TABLE IF EXISTS "transcript_entries"`);
     }
