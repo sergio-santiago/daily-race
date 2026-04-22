@@ -69,7 +69,7 @@ El sistema monitoriza la reunion de Google Meet:
 
 - **Cada 5 segundos**
 - **De lunes a viernes**
-- **De 9:00 a 12:00** (Europe/Madrid)
+- **De 8:00 a 12:00** (Europe/Madrid)
 
 Solo detecta reuniones que empezaron dentro de **±30 minutos** de la hora programada del evento.
 
@@ -146,7 +146,7 @@ Los comandos `dev-preview-*` estan bloqueados en produccion (`NODE_ENV=productio
 
 El backend incluye un **scheduler (cron)** que monitoriza la daily **en tiempo real**:
 
-- Se ejecuta **cada 5 segundos, de lunes a viernes, de 9:00 a 12:00** (Europe/Madrid)
+- Se ejecuta **cada 5 segundos, de lunes a viernes, de 8:00 a 12:00** (Europe/Madrid)
 - **Durante la reunion** (meeting activo en Google Meet):
   1. Detecta el meeting activo y crea un mensaje **en directo** en **#race-day** (Discord)
   2. Cada 5 segundos comprueba si hay nuevos participantes
