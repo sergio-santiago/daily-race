@@ -9,28 +9,42 @@ const HEAVY_SEP = '\u2550';
 const ELLIPSIS = '\u2026';
 const REZAGADO_RATIO = 0.1;
 
+// Discord embed code blocks have an effective rendering width of ~33 visual
+// cells in narrow client views and they soft-break at:
+//   - every regular space (word-wrap)
+//   - the boundary between adjacent characters from different scripts
+//     (notably ASCII digit/letter \u2192 emoji)
+// Mitigations applied per row:
+//   - NBSP (U+00A0) instead of every regular space, so word-wrap can't trigger
+//   - WJ (U+2060, Word Joiner, zero-width) glued before each emoji, so the
+//     digit\u2192emoji boundary is no longer a valid break opportunity
+//   - total row width <=33 cells so character-wrap doesn't trigger either
+const NBSP = '\u00a0';
+const WJ = '\u2060';
+const nbspify = (s: string): string => s.replace(/ /g, NBSP);
+
 // Discord hard-caps embed description at 4096 chars. We chunk the monospace
 // table body with a safety margin to leave room for the summary line on the
 // first embed and the legend on the last one.
 const DESCRIPTION_CHUNK_LIMIT = 3800;
 
-// Column widths (aligned for monospace rendering in Discord code blocks).
-// Emojis in positionLabel count as 2 visual cells but 1 string char, so the
-// position column uses a string width of 4 that renders as 4 visual cells
-// for numeric labels ("10  ") and ~4 for emoji labels (" 1🏆", "18💀").
+// Column widths sized to fit in <=33 visual cells per row.
+// Emojis in positionLabel count as 2 visual cells; WJ is zero-width.
 const COL_POS = 4;
-const COL_NAME = 24;
+const COL_NAME = 13;
 const COL_GAP = '  ';
 
-// Daily race grid columns — total row: 4+2+24+2+5+2+13 = 52 chars
-const COL_GRID_PTS = 5;
-const COL_GRID_TIME = 13;
+// Daily race grid columns — total row: 4+2+13+2+3+2+7 = 33 cells
+const COL_GRID_PTS = 3;
+const COL_GRID_TIME = 7;
 
-// Championship table columns — total row: 4+2+24+2+5+2+4+2+4+2+4 = 55 chars
-const COL_CHAMP_PTS = 5;
-const COL_CHAMP_GP = 4;
-const COL_CHAMP_W = 4;
-const COL_CHAMP_PODIUM = 4;
+// Championship table columns — total row: 4+2+13+2+4+1+3+1+3 = 33 cells
+// GP column dropped: it equals races attended (already in the summary line)
+// and is ≈uniform across drivers, so it adds little signal at this width.
+const COL_CHAMP_PTS = 4;
+const COL_CHAMP_W = 3;
+const COL_CHAMP_PODIUM = 3;
+const COL_CHAMP_INNER_GAP = ' ';
 
 export interface DiscordEmbed {
   title?: string;
@@ -100,8 +114,7 @@ export class DiscordFormatterService {
     const driversLabel = standings.length === 1 ? 'piloto' : 'pilotos';
     const dateStr = this.formatDate(new Date());
     const summary = `\u{1F3C1}  **${racesCount}** ${racesLabel}  \u{B7}  \u{1F3CE}\u{FE0F}  **${standings.length}** ${driversLabel}`;
-    const legend =
-      '-# **GP** grandes premios  \u{B7}  **W** victorias  \u{B7}  **PD** podios';
+    const legend = '-# **W** victorias  \u{B7}  **PD** podios';
     const chunks = this.chunkText(gridText, DESCRIPTION_CHUNK_LIMIT);
 
     return chunks.map((chunk, i) => {
@@ -211,14 +224,14 @@ export class DiscordFormatterService {
   }
 
   private buildGridHeader(): string {
-    return (
+    return nbspify(
       'Pos'.padEnd(COL_POS) +
-      COL_GAP +
-      'Piloto'.padEnd(COL_NAME) +
-      COL_GAP +
-      'Pts'.padStart(COL_GRID_PTS) +
-      COL_GAP +
-      'Tiempo'.padStart(COL_GRID_TIME)
+        COL_GAP +
+        'Piloto'.padEnd(COL_NAME) +
+        COL_GAP +
+        'Pts'.padStart(COL_GRID_PTS) +
+        COL_GAP +
+        'Tiempo'.padStart(COL_GRID_TIME),
     );
   }
 
@@ -226,10 +239,10 @@ export class DiscordFormatterService {
     const timeStr = this.formatTime(greenLight);
     const label = ` \u{1F6A5}  ${timeStr}  `;
     const sideLen = Math.floor((width - label.length) / 2);
-    return (
+    return nbspify(
       SEP.repeat(sideLen) +
-      label +
-      SEP.repeat(Math.max(0, width - sideLen - label.length))
+        label +
+        SEP.repeat(Math.max(0, width - sideLen - label.length)),
     );
   }
 
@@ -238,7 +251,6 @@ export class DiscordFormatterService {
       const pos = this.championshipPosLabel(s.rank);
       const name = this.truncate(s.driver.displayName, COL_NAME);
       const pts = String(s.totalPoints).padStart(COL_CHAMP_PTS);
-      const races = String(s.racesAttended).padStart(COL_CHAMP_GP);
       const wins = String(s.wins).padStart(COL_CHAMP_W);
       const podiums = String(s.podiums).padStart(COL_CHAMP_PODIUM);
       return (
@@ -247,29 +259,26 @@ export class DiscordFormatterService {
         name +
         COL_GAP +
         pts +
-        COL_GAP +
-        races +
-        COL_GAP +
+        COL_CHAMP_INNER_GAP +
         wins +
-        COL_GAP +
+        COL_CHAMP_INNER_GAP +
         podiums
       );
     });
 
-    const header =
+    const header = nbspify(
       'Pos'.padEnd(COL_POS) +
-      COL_GAP +
-      'Piloto'.padEnd(COL_NAME) +
-      COL_GAP +
-      'Pts'.padStart(COL_CHAMP_PTS) +
-      COL_GAP +
-      'GP'.padStart(COL_CHAMP_GP) +
-      COL_GAP +
-      'W'.padStart(COL_CHAMP_W) +
-      COL_GAP +
-      'PD'.padStart(COL_CHAMP_PODIUM);
+        COL_GAP +
+        'Piloto'.padEnd(COL_NAME) +
+        COL_GAP +
+        'Pts'.padStart(COL_CHAMP_PTS) +
+        COL_CHAMP_INNER_GAP +
+        'W'.padStart(COL_CHAMP_W) +
+        COL_CHAMP_INNER_GAP +
+        'PD'.padStart(COL_CHAMP_PODIUM),
+    );
 
-    return [header, HEAVY_SEP.repeat(header.length), '', ...rows].join('\n');
+    return [header, HEAVY_SEP.repeat(header.length), '', ...rows.map(nbspify)].join('\n');
   }
 
   // ── Stats building ─────────────────────────────────────────
@@ -292,34 +301,34 @@ export class DiscordFormatterService {
     const pts = String(entry.points).padStart(COL_GRID_PTS);
     const diff = this.formatDiff(entry.diffSeconds);
 
-    return pos + COL_GAP + name + COL_GAP + pts + COL_GAP + diff;
+    return nbspify(pos + COL_GAP + name + COL_GAP + pts + COL_GAP + diff);
   }
 
   positionLabel(entry: StartingGridEntry, cleanGridSize?: number): string {
     const numStr = String(entry.position).padStart(2);
 
     if (entry.isFalseStart) {
-      return numStr + (entry.isWorstOnGrid ? '\u{1F480}' : '\u{26D4}');
+      return numStr + WJ + (entry.isWorstOnGrid ? '\u{1F480}' : '\u{26D4}');
     }
 
     const n = entry.position;
-    if (n === 1) return ' 1\u{1F3C6}';
-    if (n === 2) return ' 2\u{1F948}';
-    if (n === 3) return ' 3\u{1F949}';
-    if (entry.isWorstOnGrid) return numStr + '\u{1F480}';
+    if (n === 1) return ' 1' + WJ + '\u{1F3C6}';
+    if (n === 2) return ' 2' + WJ + '\u{1F948}';
+    if (n === 3) return ' 3' + WJ + '\u{1F949}';
+    if (entry.isWorstOnGrid) return numStr + WJ + '\u{1F480}';
     if (
       cleanGridSize &&
       n > cleanGridSize - Math.floor(cleanGridSize * REZAGADO_RATIO)
     ) {
-      return numStr + '\u{1F422}';
+      return numStr + WJ + '\u{1F422}';
     }
     return numStr + '  ';
   }
 
   championshipPosLabel(rank: number): string {
-    if (rank === 1) return ' 1\u{1F3C6}';
-    if (rank === 2) return ' 2\u{1F948}';
-    if (rank === 3) return ' 3\u{1F949}';
+    if (rank === 1) return ' 1' + WJ + '\u{1F3C6}';
+    if (rank === 2) return ' 2' + WJ + '\u{1F948}';
+    if (rank === 3) return ' 3' + WJ + '\u{1F949}';
     return String(rank).padStart(2) + '  ';
   }
 

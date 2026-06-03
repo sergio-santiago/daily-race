@@ -150,7 +150,6 @@ describe('DiscordFormatterService', () => {
       expect(embeds[0].title).toContain('CHAMPIONSHIP');
       expect(embeds[0].description).toContain('Piloto');
       expect(embeds[0].description).toContain('Pts');
-      expect(embeds[0].description).toContain('GP');
       expect(embeds[0].description).toContain('W');
       expect(embeds[0].description).toContain('PD');
       expect(embeds[0].description).toContain('Alice');
@@ -299,7 +298,7 @@ describe('DiscordFormatterService', () => {
     it('should include legend only on the last embed of a multi-chunk championship', () => {
       // Force multi-chunk by using many long names
       const standings = Array.from(
-        { length: 100 },
+        { length: 300 },
         (_, i) =>
           new ChampionshipStanding(
             new Driver(
@@ -322,7 +321,7 @@ describe('DiscordFormatterService', () => {
       expect(embeds.length).toBeGreaterThan(1);
 
       // Only the last embed carries the legend
-      const legendText = '**GP** grandes premios';
+      const legendText = '**W** victorias';
       const embedsWithLegend = embeds.filter((e) =>
         e.description!.includes(legendText),
       );
