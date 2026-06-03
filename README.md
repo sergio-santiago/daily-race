@@ -57,7 +57,6 @@ Los puntos se acumulan carrera a carrera en una clasificacion general:
 | **Pos** | Posicion en la clasificacion |
 | **Piloto** | Nombre del driver |
 | **Pts** | Puntos totales acumulados |
-| **GP** | Grandes Premios (carreras disputadas) |
 | **W** | Victorias (veces en P1 sin salida en falso) |
 | **PD** | Podios (veces en P1-P3 sin salida en falso) |
 
