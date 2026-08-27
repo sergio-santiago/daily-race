@@ -159,7 +159,7 @@ export class ProcessRaceUseCase {
     );
     await this.notification.publishChampionshipStandings(
       standings,
-      allRaces.length,
+      allRaces,
     );
   }
 }

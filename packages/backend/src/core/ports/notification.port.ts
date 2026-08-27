@@ -8,7 +8,7 @@ export interface NotificationPort {
   publishRaceResults(race: Race): Promise<void>;
   publishChampionshipStandings(
     standings: ChampionshipStanding[],
-    racesCount: number,
+    races: Race[],
   ): Promise<void>;
 
   createLiveRaceMessage(
