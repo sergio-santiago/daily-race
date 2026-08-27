@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MonitorLiveRaceUseCase } from '../monitor-live-race.use-case';
 import { BuildStartingGridUseCase } from '../build-starting-grid.use-case';
@@ -376,10 +377,202 @@ describe('MonitorLiveRaceUseCase', () => {
 
       await useCase.execute();
 
-      // State cleared — next tick goes to detect mode
+      // State cleared, next tick goes to detect mode
       calendarProvider.getDailyEvent.mockResolvedValue(null);
       await useCase.execute();
       expect(calendarProvider.getDailyEvent).toHaveBeenCalled();
+    });
+  });
+
+  describe('finalization failure paths', () => {
+    const endedRecord = {
+      name: 'conf/1',
+      meetingCode: 'wye-iwfu-jch',
+      startTime: new Date('2026-03-27T09:30:00.000Z'),
+      endTime: new Date('2026-03-27T09:55:00.000Z'),
+    };
+    let storedRace: Race | null = null;
+
+    beforeEach(async () => {
+      calendarProvider.getDailyEvent.mockResolvedValue(mockCalendarEvent());
+      findConferenceRecord.findActiveForEvent.mockResolvedValue({
+        name: 'conf/1',
+        meetingCode: 'wye-iwfu-jch',
+        startTime: new Date('2026-03-27T09:30:00.000Z'),
+        endTime: null,
+      });
+      meetProvider.getParticipants.mockResolvedValue(mockParticipants(2));
+      await useCase.execute();
+      jest.clearAllMocks();
+
+      // A partir de aqui el meeting ya ha terminado
+      findConferenceRecord.findByName.mockResolvedValue(endedRecord);
+      meetProvider.getParticipants.mockResolvedValue(mockParticipants(2));
+      driverRepository.upsert.mockImplementation(
+        async (d) => new Driver('d1', d.googleId, d.displayName, d.email),
+      );
+
+      // BD en memoria: la carrera guardada se recupera en los reintentos
+      storedRace = null;
+      raceRepository.save.mockImplementation(async (race) => {
+        storedRace = new Race(
+          'race-1',
+          race.conferenceRecordName,
+          race.meetingCode,
+          race.greenLight,
+          race.endTime,
+          race.status,
+          race.startingGrid,
+          race.processedAt,
+        );
+        return storedRace;
+      });
+      raceRepository.findByConferenceRecordName.mockImplementation(
+        async () => storedRace,
+      );
+    });
+
+    it('should keep the happy path intact: one notification each and state cleared', async () => {
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+
+      await useCase.execute();
+
+      expect(raceRepository.save).toHaveBeenCalledTimes(1);
+      expect(gridRepository.saveAll).toHaveBeenCalledTimes(1);
+      expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
+      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(1);
+      expect(errorSpy).not.toHaveBeenCalled();
+
+      jest.clearAllMocks();
+      calendarProvider.getDailyEvent.mockResolvedValue(null);
+      await useCase.execute();
+
+      expect(findConferenceRecord.findByName).not.toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
+    it('should retry the final edit on the next tick when it fails once', async () => {
+      notification.editLiveRaceMessageAsFinal.mockRejectedValueOnce(
+        new Error('429 rate limited'),
+      );
+
+      await useCase.execute();
+
+      expect(raceRepository.save).toHaveBeenCalledTimes(1);
+      expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
+      // Un fallo del mensaje final no impide publicar el campeonato
+      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(1);
+
+      await useCase.execute();
+
+      // La carrera no se vuelve a guardar, se recupera de la BD
+      expect(raceRepository.save).toHaveBeenCalledTimes(1);
+      expect(gridRepository.saveAll).toHaveBeenCalledTimes(1);
+      expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(2);
+      // El campeonato ya salio, no se repite
+      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(1);
+
+      const [messageId, race] =
+        notification.editLiveRaceMessageAsFinal.mock.calls[1];
+      expect(messageId).toBe('msg-123');
+      expect(race.id).toBe('race-1');
+      expect(race.startingGrid).toHaveLength(2);
+
+      jest.clearAllMocks();
+      calendarProvider.getDailyEvent.mockResolvedValue(null);
+      await useCase.execute();
+
+      expect(findConferenceRecord.findByName).not.toHaveBeenCalled();
+    });
+
+    it('should retry the championship on the next tick when it fails once', async () => {
+      notification.publishChampionshipStandings.mockRejectedValueOnce(
+        new Error('500 internal error'),
+      );
+
+      await useCase.execute();
+
+      expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
+      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(1);
+
+      await useCase.execute();
+
+      // El mensaje final ya estaba bien, no se vuelve a editar
+      expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
+      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(2);
+      expect(raceRepository.save).toHaveBeenCalledTimes(1);
+
+      jest.clearAllMocks();
+      calendarProvider.getDailyEvent.mockResolvedValue(null);
+      await useCase.execute();
+
+      expect(findConferenceRecord.findByName).not.toHaveBeenCalled();
+    });
+
+    it('should retry persistence when the DB fails and notify nothing meanwhile', async () => {
+      raceRepository.findByConferenceRecordName.mockRejectedValueOnce(
+        new Error('ECONNRESET'),
+      );
+
+      await useCase.execute();
+
+      expect(raceRepository.save).not.toHaveBeenCalled();
+      expect(notification.editLiveRaceMessageAsFinal).not.toHaveBeenCalled();
+      expect(notification.publishChampionshipStandings).not.toHaveBeenCalled();
+
+      await useCase.execute();
+
+      expect(raceRepository.save).toHaveBeenCalledTimes(1);
+      expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
+      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(1);
+    });
+
+    it('should retry pending notifications even if the conference record disappears', async () => {
+      notification.editLiveRaceMessageAsFinal.mockRejectedValueOnce(
+        new Error('503 service unavailable'),
+      );
+
+      await useCase.execute();
+      findConferenceRecord.findByName.mockResolvedValue(null);
+
+      await useCase.execute();
+
+      expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(2);
+      expect(raceRepository.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('should give up after the retry cap and log the pending championship', async () => {
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+      notification.publishChampionshipStandings.mockRejectedValue(
+        new Error('500 internal error'),
+      );
+
+      await useCase.execute();
+      await useCase.execute();
+      await useCase.execute();
+
+      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(3);
+      expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
+
+      const logged = errorSpy.mock.calls.map((call) => String(call[0]));
+      expect(
+        logged.some((line) =>
+          line.includes('Campeonato no publicado para la carrera conf/1'),
+        ),
+      ).toBe(true);
+
+      // Estado limpio: no se reintenta un cuarto tick
+      jest.clearAllMocks();
+      calendarProvider.getDailyEvent.mockResolvedValue(null);
+      await useCase.execute();
+
+      expect(findConferenceRecord.findByName).not.toHaveBeenCalled();
+      expect(notification.publishChampionshipStandings).not.toHaveBeenCalled();
+      errorSpy.mockRestore();
     });
   });
 });
