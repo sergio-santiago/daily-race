@@ -4,9 +4,28 @@ import { NotificationPort } from '../../core/ports/notification.port';
 import { Race } from '../../core/entities/race.entity';
 import { StartingGridEntry } from '../../core/entities/starting-grid-entry.entity';
 import { ChampionshipStanding } from '../../core/entities/championship-standing.entity';
-import { DiscordFormatterService } from './discord-formatter.service';
+import { DiscordFormatterService, DiscordEmbed } from './discord-formatter.service';
+import { ChampionshipEvolutionChartService } from '../charts/championship-evolution-chart.service';
+import { RaceGapChartService } from '../charts/race-gap-chart.service';
 
 const EMBED_SEND_DELAY_MS = 500;
+const CHAMPIONSHIP_CHART_FILENAME = 'championship-evolution.png';
+const RACE_CHART_FILENAME = 'race-gaps.png';
+
+// Un solo 429 al cerrar la carrera se llevaba por delante el mensaje del dia.
+// 429 trae su propia espera en retry_after, el resto va con backoff exponencial.
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+const MAX_ATTEMPTS = 3;
+const BASE_BACKOFF_MS = 500;
+const MIN_WAIT_MS = 50;
+const MAX_WAIT_MS = 10_000;
+// Discord senala el campo que falla en el cuerpo del 400, hay que registrarlo
+const ERROR_BODY_MAX_CHARS = 500;
+
+interface WebhookFile {
+  name: string;
+  data: Buffer;
+}
 
 @Injectable()
 export class DiscordWebhookAdapter implements NotificationPort {
@@ -17,6 +36,8 @@ export class DiscordWebhookAdapter implements NotificationPort {
   constructor(
     config: ConfigService,
     private readonly formatter: DiscordFormatterService,
+    private readonly championshipChart: ChampionshipEvolutionChartService,
+    private readonly raceGapChart: RaceGapChartService,
   ) {
     this.raceDayWebhook = config.getOrThrow('DISCORD_WEBHOOK_RACE_DAY');
     this.championshipWebhook = config.getOrThrow('DISCORD_WEBHOOK_CHAMPIONSHIP');
@@ -24,32 +45,41 @@ export class DiscordWebhookAdapter implements NotificationPort {
 
   async publishRaceResults(race: Race): Promise<void> {
     const embeds = this.formatter.formatRaceEmbeds(race);
+    const chart = this.tryRenderRaceChart(race.startingGrid, race.greenLight);
+    this.attachChartToLastEmbed(embeds, chart);
 
     for (let i = 0; i < embeds.length; i++) {
+      const isLast = i === embeds.length - 1;
       await this.sendWebhook(
         { username: 'Daily Race', embeds: [embeds[i]] },
         this.raceDayWebhook,
+        isLast ? chart : undefined,
       );
-      if (i < embeds.length - 1) await this.sleep(EMBED_SEND_DELAY_MS);
+      if (!isLast) await this.sleep(EMBED_SEND_DELAY_MS);
     }
   }
 
   async publishChampionshipStandings(
     standings: ChampionshipStanding[],
-    racesCount: number,
+    races: Race[],
   ): Promise<void> {
     const embeds = this.formatter.formatChampionshipEmbeds(
       standings,
-      racesCount,
+      races.length,
     );
     if (embeds.length === 0) return;
 
+    const chart = this.tryRenderChampionshipChart(standings, races);
+    this.attachChartToLastEmbed(embeds, chart);
+
     for (let i = 0; i < embeds.length; i++) {
+      const isLast = i === embeds.length - 1;
       await this.sendWebhook(
         { username: 'Daily Race', embeds: [embeds[i]] },
         this.championshipWebhook,
+        isLast ? chart : undefined,
       );
-      if (i < embeds.length - 1) await this.sleep(EMBED_SEND_DELAY_MS);
+      if (!isLast) await this.sleep(EMBED_SEND_DELAY_MS);
     }
   }
 
@@ -58,8 +88,15 @@ export class DiscordWebhookAdapter implements NotificationPort {
     greenLight: Date,
   ): Promise<string> {
     const embeds = this.formatter.formatLiveRaceEmbeds(grid, greenLight);
+    const chart = this.tryRenderRaceChart(grid, greenLight, { live: true });
+    this.attachChartToLastEmbed(embeds, chart);
+
     const body = { username: 'Daily Race', embeds };
-    const response = await this.sendWebhookWithResponse(body, this.raceDayWebhook);
+    const response = await this.sendWebhookWithResponse(
+      body,
+      this.raceDayWebhook,
+      chart,
+    );
     return response.id as string;
   }
 
@@ -69,7 +106,14 @@ export class DiscordWebhookAdapter implements NotificationPort {
     greenLight: Date,
   ): Promise<void> {
     const embeds = this.formatter.formatLiveRaceEmbeds(grid, greenLight);
-    await this.editWebhookMessage(messageId, { embeds }, this.raceDayWebhook);
+    const chart = this.tryRenderRaceChart(grid, greenLight, { live: true });
+    this.attachChartToLastEmbed(embeds, chart);
+    await this.editWebhookMessage(
+      messageId,
+      { embeds },
+      this.raceDayWebhook,
+      chart,
+    );
   }
 
   async editLiveRaceMessageAsFinal(
@@ -77,44 +121,206 @@ export class DiscordWebhookAdapter implements NotificationPort {
     race: Race,
   ): Promise<void> {
     const embeds = this.formatter.formatRaceEmbeds(race);
-    await this.editWebhookMessage(messageId, { embeds }, this.raceDayWebhook);
+    const chart = this.tryRenderRaceChart(race.startingGrid, race.greenLight);
+    this.attachChartToLastEmbed(embeds, chart);
+    await this.editWebhookMessage(
+      messageId,
+      { embeds },
+      this.raceDayWebhook,
+      chart,
+    );
   }
 
-  private sleep(ms: number): Promise<void> {
+  // ── Charts ─────────────────────────────────────────────────
+
+  private tryRenderChampionshipChart(
+    standings: ChampionshipStanding[],
+    races: Race[],
+  ): WebhookFile | undefined {
+    try {
+      const png = this.championshipChart.renderPng(standings, races);
+      return png ? { name: CHAMPIONSHIP_CHART_FILENAME, data: png } : undefined;
+    } catch (error) {
+      this.logger.warn(`Championship chart render failed: ${error}`);
+      return undefined;
+    }
+  }
+
+  private tryRenderRaceChart(
+    grid: StartingGridEntry[],
+    greenLight: Date,
+    options: { live?: boolean } = {},
+  ): WebhookFile | undefined {
+    try {
+      const png = this.raceGapChart.renderPng(grid, greenLight, options);
+      return png ? { name: RACE_CHART_FILENAME, data: png } : undefined;
+    } catch (error) {
+      this.logger.warn(`Race gap chart render failed: ${error}`);
+      return undefined;
+    }
+  }
+
+  private attachChartToLastEmbed(
+    embeds: DiscordEmbed[],
+    chart: WebhookFile | undefined,
+  ): void {
+    if (!chart || embeds.length === 0) return;
+    embeds[embeds.length - 1].image = { url: `attachment://${chart.name}` };
+  }
+
+  // ── HTTP ───────────────────────────────────────────────────
+
+  /**
+   * Unico punto de espera del adapter (retries y separacion entre embeds). Es
+   * protected a proposito: los tests lo sustituyen para no tardar segundos.
+   */
+  protected sleep(ms: number): Promise<void> {
     return new Promise((r) => setTimeout(r, ms));
+  }
+
+  /**
+   * Con fichero adjunto Discord exige multipart/form-data: el JSON viaja en
+   * payload_json y cada fichero en files[i]. El array attachments referencia
+   * los ficheros nuevos y, en un PATCH, descarta los adjuntos anteriores.
+   */
+  private buildRequestInit(
+    method: 'POST' | 'PATCH',
+    payload: Record<string, unknown>,
+    file?: WebhookFile,
+  ): RequestInit {
+    if (!file) {
+      return {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      };
+    }
+
+    const form = new FormData();
+    form.append(
+      'payload_json',
+      JSON.stringify({
+        ...payload,
+        attachments: [{ id: 0, filename: file.name }],
+      }),
+    );
+    form.append(
+      'files[0]',
+      new Blob([new Uint8Array(file.data)], { type: 'image/png' }),
+      file.name,
+    );
+    return { method, body: form };
+  }
+
+  /**
+   * Reintenta 429 (respetando retry_after) y los 5xx transitorios. El init se
+   * reconstruye en cada intento: un FormData ya enviado no se puede reutilizar.
+   */
+  private async request(
+    url: string,
+    buildInit: () => RequestInit,
+    context: string,
+  ): Promise<Response> {
+    for (let attempt = 1; ; attempt++) {
+      const response = await fetch(url, buildInit());
+      if (response.ok) return response;
+
+      const body = await this.readBody(response);
+      const isRetryable = RETRYABLE_STATUSES.has(response.status);
+      const hasAttemptsLeft = attempt < MAX_ATTEMPTS;
+
+      this.logger.error(
+        `${context} failed: ${response.status} ${response.statusText} ` +
+          `(intento ${attempt}/${MAX_ATTEMPTS})` +
+          (body ? ` body=${body}` : ''),
+      );
+
+      if (!isRetryable || !hasAttemptsLeft) {
+        throw new Error(`${context} failed: ${response.status}`);
+      }
+
+      const waitMs = this.retryWaitMs(response, body, attempt);
+      this.logger.warn(`${context}: reintento en ${waitMs} ms`);
+      await this.sleep(waitMs);
+    }
+  }
+
+  private retryWaitMs(
+    response: Response,
+    body: string,
+    attempt: number,
+  ): number {
+    if (response.status === 429) {
+      // Discord manda los segundos (decimales) en el cuerpo y en la cabecera
+      const seconds =
+        this.retryAfterFromBody(body) ?? this.retryAfterFromHeader(response);
+      if (seconds !== undefined) {
+        // Con retry_after 0 Discord aun no acepta la siguiente, no se reintenta
+        // en el mismo instante
+        const ms = Math.max(MIN_WAIT_MS, Math.ceil(seconds * 1000));
+        return Math.min(ms, MAX_WAIT_MS);
+      }
+    }
+    return Math.min(BASE_BACKOFF_MS * 2 ** (attempt - 1), MAX_WAIT_MS);
+  }
+
+  private retryAfterFromBody(body: string): number | undefined {
+    if (!body) return undefined;
+    try {
+      const parsed = JSON.parse(body) as { retry_after?: unknown };
+      const value = Number(parsed.retry_after);
+      return Number.isFinite(value) && value >= 0 ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private retryAfterFromHeader(response: Response): number | undefined {
+    try {
+      const raw = response.headers?.get('retry-after');
+      if (!raw) return undefined;
+      const value = Number(raw);
+      return Number.isFinite(value) && value >= 0 ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** El cuerpo de un error es la unica pista de que campo rechaza Discord */
+  private async readBody(response: Response): Promise<string> {
+    try {
+      const text = await response.text();
+      const flat = text.replace(/\s+/g, ' ').trim();
+      return flat.length > ERROR_BODY_MAX_CHARS
+        ? `${flat.slice(0, ERROR_BODY_MAX_CHARS)}...`
+        : flat;
+    } catch {
+      return '';
+    }
   }
 
   private async sendWebhook(
     body: Record<string, unknown>,
     webhookUrl: string,
+    file?: WebhookFile,
   ): Promise<void> {
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      this.logger.error(
-        `Discord webhook failed: ${response.status} ${response.statusText}`,
-      );
-      throw new Error(`Discord webhook failed: ${response.status}`);
-    }
+    await this.request(
+      webhookUrl,
+      () => this.buildRequestInit('POST', body, file),
+      'Discord webhook',
+    );
   }
 
   private async sendWebhookWithResponse(
     body: Record<string, unknown>,
     webhookUrl: string,
+    file?: WebhookFile,
   ): Promise<Record<string, unknown>> {
-    const response = await fetch(`${webhookUrl}?wait=true`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Discord webhook failed: ${response.status}`);
-    }
+    const response = await this.request(
+      `${webhookUrl}?wait=true`,
+      () => this.buildRequestInit('POST', body, file),
+      'Discord webhook',
+    );
     return response.json() as Promise<Record<string, unknown>>;
   }
 
@@ -122,18 +328,14 @@ export class DiscordWebhookAdapter implements NotificationPort {
     messageId: string,
     body: Record<string, unknown>,
     webhookUrl: string,
+    file?: WebhookFile,
   ): Promise<void> {
-    const response = await fetch(`${webhookUrl}/messages/${messageId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      this.logger.error(
-        `Discord message edit failed: ${response.status} ${response.statusText}`,
-      );
-      throw new Error(`Discord message edit failed: ${response.status}`);
-    }
+    // Sin fichero nuevo, attachments vacio elimina cualquier adjunto previo
+    const payload = file ? body : { ...body, attachments: [] };
+    await this.request(
+      `${webhookUrl}/messages/${messageId}`,
+      () => this.buildRequestInit('PATCH', payload, file),
+      'Discord message edit',
+    );
   }
 }

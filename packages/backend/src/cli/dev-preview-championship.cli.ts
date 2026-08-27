@@ -34,7 +34,7 @@ async function run() {
       ALL_TIME_END,
     );
 
-    await notification.publishChampionshipStandings(standings, allRaces.length);
+    await notification.publishChampionshipStandings(standings, allRaces);
 
     logger.log(
       `Published championship with ${standings.length} drivers across ${allRaces.length} races`,
