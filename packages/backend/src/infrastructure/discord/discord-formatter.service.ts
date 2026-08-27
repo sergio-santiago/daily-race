@@ -204,10 +204,7 @@ export class DiscordFormatterService {
   }
 
   private buildLiveStats(grid: StartingGridEntry[]): string {
-    const busted = grid.find((e) => e.isWorstOnGrid);
-    if (!busted) return '';
-
-    return this.bustedChip(busted.driver.displayName, busted.diffSeconds);
+    return this.bustedChip(grid.filter((e) => e.isWorstOnGrid));
   }
 
   // ── Grid building ──────────────────────────────────────────
@@ -304,10 +301,7 @@ export class DiscordFormatterService {
   // ── Stats building ─────────────────────────────────────────
 
   private buildRaceStats(race: Race): string {
-    const busted = race.startingGrid.find((e) => e.isWorstOnGrid);
-    if (!busted) return '';
-
-    return this.bustedChip(busted.driver.displayName, busted.diffSeconds);
+    return this.bustedChip(race.startingGrid.filter((e) => e.isWorstOnGrid));
   }
 
   // ── Row formatting ─────────────────────────────────────────
@@ -384,13 +378,37 @@ export class DiscordFormatterService {
     return this.truncate(this.sanitizeName(name), max);
   }
 
-  private bustedChip(name: string, diffSeconds: number): string {
+  /**
+   * La calavera puede ser compartida: si el extremo esta empatado al instante, es
+   * de todos los empatados, que por definicion tienen el mismo tiempo. De tres en
+   * adelante se cuenta el resto en vez de enumerarlo, igual que en la grafica,
+   * para que el mensaje y la imagen digan lo mismo.
+   */
+  private bustedChip(busted: StartingGridEntry[]): string {
+    if (busted.length === 0) return '';
+
     // El chip va fuera del bloque de codigo, asi que no lo ata la columna de 13,
     // pero se acota igual: el campo del embed tiene un tope de 1024 caracteres y
     // escapar markdown puede duplicar cada caracter
-    const capped = this.truncate(this.sanitizeName(name), BUSTED_NAME_MAX).trimEnd();
-    const label = this.escapeMarkdown(capped);
-    return `\u{1F480}  Busted: **${label}** (${this.formatDiff(diffSeconds).trim()})`;
+    const nombre = (entry: StartingGridEntry): string =>
+      this.escapeMarkdown(
+        this.truncate(
+          this.sanitizeName(entry.driver.displayName),
+          BUSTED_NAME_MAX,
+        ).trimEnd(),
+      );
+
+    let label: string;
+    if (busted.length === 1) {
+      label = `**${nombre(busted[0])}**`;
+    } else if (busted.length === 2) {
+      label = `**${nombre(busted[0])}** y **${nombre(busted[1])}**`;
+    } else {
+      label = `**${nombre(busted[0])}** y ${busted.length - 1} más`;
+    }
+
+    const time = this.formatDiff(busted[0].diffSeconds).trim();
+    return `\u{1F480}  Busted: ${label} (${time})`;
   }
 
   // ── Utilities ──────────────────────────────────────────────

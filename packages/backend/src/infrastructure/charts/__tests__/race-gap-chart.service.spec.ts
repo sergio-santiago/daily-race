@@ -3,6 +3,7 @@ import { SvgToPngService } from '../svg-to-png.service';
 import { GREEN_LIGHT, LONGEST_NAMES, REAL_RACE_62, grid } from './fixtures';
 import { OUTPUT_WIDTH } from '../frame';
 import { inkPixels } from './png';
+import { textWidth } from '../text';
 
 describe('RaceGapChartService', () => {
   const service = new RaceGapChartService(new SvgToPngService());
@@ -336,9 +337,10 @@ describe('RaceGapChartService', () => {
     expect(service.buildSvg(plural, GREEN_LIGHT)!).not.toContain('BUSTED');
   });
 
-  it('renuncia a la anotacion del ultimo si el chip de busted no deja hueco', () => {
-    // Con un nombre de ochenta caracteres el chip se come la franja: antes que
-    // superponer dos anotaciones, la de la derecha no se pinta
+  it('acota el chip de busted para que quepan las dos anotaciones', () => {
+    // Con un nombre de ochenta caracteres el chip se comia la franja entera y
+    // habia que renunciar a la anotacion de la derecha. Ahora el nombre se acota
+    // a su presupuesto y caben las dos, sin tocarse
     const longName =
       'Enrique Caballero Domínguez de la Serna y Montenegro del Valle Inclán Sanchidrián';
     const crowded = grid([
@@ -352,7 +354,24 @@ describe('RaceGapChartService', () => {
     const svg = service.buildSvg(crowded, GREEN_LIGHT)!;
 
     expect(svg).toContain('BUSTED');
-    expect(svg).not.toContain('último en entrar');
+    // El nombre se recorta en vez de estirar el chip
+    expect(svg).toMatch(/BUSTED · [^<]*…/);
+
+    // Y las dos anotaciones no se pisan: el hexagono del chip termina antes de
+    // donde arranca el texto de la derecha
+    const chipEnd = Number(
+      /<polygon points="35,341 ([\d.]+),341/.exec(svg)![1],
+    );
+    const noteAnchor = Number(
+      /<text x="([\d.]+)"[^>]*>último en entrar/.exec(svg)![1],
+    );
+    const noteWidth = textWidth('último en entrar · Eva', {
+      size: 10.5,
+      family: 'name',
+      fill: '',
+    });
+
+    expect(noteAnchor - noteWidth).toBeGreaterThan(chipEnd);
   });
 
   it('genera un PNG con la tinta de los glifos, no solo con la firma', () => {
@@ -379,4 +398,54 @@ describe('RaceGapChartService', () => {
   it('no devuelve PNG cuando no hay grafica que dibujar', () => {
     expect(service.renderPng([], GREEN_LIGHT)).toBeNull();
   });
+
+  describe('empates compartidos', () => {
+    it('pinta dos oros y salta la plata cuando se comparte el P1', () => {
+      // Con posicion compartida no existe un P2: el siguiente es P3
+      const empatados = grid([
+        { name: 'Ana', diff: 1.5, position: 1, points: 25 },
+        { name: 'Bruno', diff: 1.5, position: 1, points: 25 },
+        { name: 'Carla', diff: 4, position: 3, points: 15 },
+      ]);
+      const svg = service.buildSvg(empatados, GREEN_LIGHT)!;
+
+      expect(svg.match(/url\(#gold\)/g)!.length).toBeGreaterThanOrEqual(2);
+      expect(svg).not.toContain('url(#silver)');
+      expect(svg).toContain('url(#bronze)');
+
+      // Las dos tarjetas de oro se tinen igual: el tinte va por posicion y no
+      // por indice, que dejaba la segunda mas apagada pese a ser el mismo puesto
+      const tintes = [...svg.matchAll(/height="78" rx="3" fill="rgba\(([^)]+)\)"/g)].map(
+        (m) => m[1],
+      );
+      expect(tintes[0]).toBe(tintes[1]);
+      expect(tintes[2]).not.toBe(tintes[0]);
+      // Margen del podio de cero, porque los dos primeros entraron a la vez
+      expect(svg).toContain('+0.000s');
+    });
+
+    it('reparte la calavera entre los dos empatados', () => {
+      const empatados = grid([
+        { name: 'Ana', diff: 0.5, position: 1, points: 25 },
+        { name: 'Tarde A', diff: 42, position: 2, points: 18, worst: true },
+        { name: 'Tarde B', diff: 42, position: 2, points: 18, worst: true },
+      ]);
+      const svg = service.buildSvg(empatados, GREEN_LIGHT)!;
+
+      expect(svg).toContain('BUSTED · TARDE A Y TARDE B · 42S');
+    });
+
+    it('cuenta el resto cuando la calavera la comparten mas de dos', () => {
+      const empatados = grid([
+        { name: 'Ana', diff: 0.5, position: 1, points: 25 },
+        { name: 'Tarde A', diff: 42, position: 2, points: 18, worst: true },
+        { name: 'Tarde B', diff: 42, position: 2, points: 18, worst: true },
+        { name: 'Tarde C', diff: 42, position: 2, points: 18, worst: true },
+      ]);
+      const svg = service.buildSvg(empatados, GREEN_LIGHT)!;
+
+      expect(svg).toContain('BUSTED · TARDE A Y 2 MÁS · 42S');
+    });
+  });
+
 });

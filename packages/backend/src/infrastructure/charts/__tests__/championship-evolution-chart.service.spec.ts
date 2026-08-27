@@ -351,4 +351,28 @@ describe('ChampionshipEvolutionChartService', () => {
     expect(service.renderPng(standings, [])).toBeNull();
     expect(service.renderPng([], races)).toBeNull();
   });
+
+  it('respeta el orden de la clasificacion, no reordena por puntos', () => {
+    // La tabla del embed y la grafica viajan en el mismo mensaje. Si la grafica
+    // reordenase por su cuenta, el desempate de la clasificacion (asistencia y
+    // luego puntualidad) quedaria contradicho por la imagen
+    const empatados = [
+      standing('Asiste Mucho', 100, 1, { races: 40 }),
+      standing('Asiste Poco', 100, 2, { races: 5 }),
+      standing('Tercero', 90, 3, { races: 20 }),
+    ];
+    const races = [
+      scoredRace('a', day(1), empatados.map((s) => s.driver.displayName)),
+      scoredRace('b', day(2), empatados.map((s) => s.driver.displayName)),
+    ];
+    const svg = service.buildSvg(empatados, races)!;
+
+    // El primero de la clasificacion lleva el badge 1 y el oro, aunque tenga los
+    // mismos puntos que el segundo
+    const etiquetas = [...svg.matchAll(/>([^<]*Asiste [A-Za-z]+)</g)].map(
+      (m) => m[1],
+    );
+    expect(etiquetas).toEqual(['Asiste Mucho', 'Asiste Poco']);
+  });
+
 });

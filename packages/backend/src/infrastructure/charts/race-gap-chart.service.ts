@@ -74,7 +74,9 @@ export class RaceGapChartService {
     const falseStarts = grid
       .filter((e) => e.isFalseStart)
       .sort((a, b) => a.diffSeconds - b.diffSeconds);
-    const busted = grid.find((e) => e.isWorstOnGrid);
+    // La calavera puede ser compartida: si el extremo esta empatado al instante,
+    // es de todos los empatados
+    const busted = grid.filter((e) => e.isWorstOnGrid);
 
     return [
       svgOpen(HEIGHT),
@@ -122,7 +124,9 @@ function podium(
     const metal = metalFor(entry.position)!;
 
     parts.push(
-      `<rect x="${n(x)}" y="${PODIUM_TOP}" width="${n(cardW)}" height="${PODIUM_H}" rx="3" fill="${rgba(metal.mid, i === 0 ? 0.075 : 0.042)}"/>`,
+      // El tinte va por posicion y no por indice: dos que comparten el P1
+      // tienen que verse igual, y por indice el segundo salia mas apagado
+      `<rect x="${n(x)}" y="${PODIUM_TOP}" width="${n(cardW)}" height="${PODIUM_H}" rx="3" fill="${rgba(metal.mid, entry.position === 1 ? 0.075 : 0.042)}"/>`,
       `<rect x="${n(x)}" y="${PODIUM_TOP}" width="2.5" height="${PODIUM_H}" fill="url(#${metalId(entry.position)})"/>`,
     );
 
@@ -218,7 +222,7 @@ function noWinners(falseStarts: StartingGridEntry[]): string {
 function strip(
   clean: StartingGridEntry[],
   falseStarts: StartingGridEntry[],
-  busted: StartingGridEntry | undefined,
+  busted: StartingGridEntry[],
 ): string {
   const parts: string[] = [];
   const x0 = PAD + 6;
@@ -439,19 +443,34 @@ function swarm({ radius, laneStep, marks }: Swarm): string {
 function annotations(
   clean: StartingGridEntry[],
   falseStarts: StartingGridEntry[],
-  busted: StartingGridEntry | undefined,
+  busted: StartingGridEntry[],
 ): string {
   const parts: string[] = [];
   let leftEdge = PAD;
 
   const last = clean[clean.length - 1];
-  const bustedIsLast = busted != null && last != null && busted === last;
+  const bustedIsLast = last != null && busted.includes(last);
 
-  if (busted) {
+  if (busted.length > 0) {
+    // El chip crece con la etiqueta y no recorta solo, asi que los nombres se
+    // acotan antes: con la calavera compartida son dos y podrian salirse
+    const time = formatShort(busted[0].diffSeconds);
+    const fixed = `busted ·  · ${time}`;
+    const budget =
+      (W - PAD * 2) * 0.62 -
+      24 -
+      textWidth(fixed.toUpperCase(), CHIP_LABEL);
+    const names = ellipsize(
+      bustedNames(busted),
+      Math.max(40, budget),
+      CHIP_LABEL.size,
+      'name',
+      700,
+    );
     const width = chip(
       PAD,
       NOTE_Y,
-      `busted · ${busted.driver.displayName} · ${formatShort(busted.diffSeconds)}`,
+      `busted · ${names} · ${time}`,
       T.red,
       parts,
     );
@@ -480,7 +499,7 @@ function annotations(
     }
   }
 
-  if (falseStarts.length > 0 && !busted) {
+  if (falseStarts.length > 0 && busted.length === 0) {
     chip(
       PAD,
       NOTE_Y,
@@ -493,6 +512,26 @@ function annotations(
 }
 
 /** Pinta un chip hexagonal y devuelve su anchura */
+/**
+ * Nombres de la calavera. A igualdad de culpa la comparten todos los empatados,
+ * pero la etiqueta tiene que seguir cabiendo, asi que de tres en adelante se
+ * cuenta el resto en vez de enumerarlo.
+ */
+function bustedNames(busted: StartingGridEntry[]): string {
+  const names = busted.map((e) => e.driver.displayName);
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} y ${names[1]}`;
+  return `${names[0]} y ${names.length - 1} más`;
+}
+
+const CHIP_LABEL = {
+  size: 10,
+  weight: 700 as const,
+  family: 'name' as const,
+  fill: '',
+  spacing: 0.9,
+};
+
 function chip(
   x: number,
   cy: number,
@@ -500,13 +539,7 @@ function chip(
   color: string,
   out: string[],
 ): number {
-  const o = {
-    size: 10,
-    weight: 700 as const,
-    family: 'name' as const,
-    fill: color,
-    spacing: 0.9,
-  };
+  const o = { ...CHIP_LABEL, fill: color };
   const upper = label.toUpperCase();
   const width = textWidth(upper, o) + 24;
   out.push(

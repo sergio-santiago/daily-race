@@ -682,3 +682,61 @@ describe('coherencia entre la tabla y la grafica', () => {
     }
   });
 });
+
+describe('calavera compartida', () => {
+  const formatter = new DiscordFormatterService();
+
+  const entry = (name: string, diff: number, worst = false): StartingGridEntry => {
+    const gl = new Date('2026-08-27T07:00:00Z');
+    return new StartingGridEntry(
+      1,
+      new Driver('id-' + name, 'g-' + name, name, null),
+      new Date(gl.getTime() + diff * 1000),
+      gl,
+      25,
+      false,
+      worst,
+    );
+  };
+
+  it('nombra a los dos cuando comparten el instante mas tardio', () => {
+    const grid = [
+      entry('Ana', 0.5),
+      entry('Tarde A', 42, true),
+      entry('Tarde B', 42, true),
+    ];
+
+    const embeds = formatter.formatLiveRaceEmbeds(grid, grid[0].greenLight);
+    const texto = JSON.stringify(embeds);
+
+    expect(texto).toContain('Tarde A');
+    expect(texto).toContain('Tarde B');
+  });
+
+  it('cuenta el resto cuando la comparten mas de dos', () => {
+    const grid = [
+      entry('Ana', 0.5),
+      entry('Tarde A', 42, true),
+      entry('Tarde B', 42, true),
+      entry('Tarde C', 42, true),
+    ];
+
+    const texto = JSON.stringify(
+      formatter.formatLiveRaceEmbeds(grid, grid[0].greenLight),
+    );
+
+    expect(texto).toContain('Tarde A');
+    expect(texto).toContain('2 más');
+    expect(texto).not.toContain('Tarde C');
+  });
+
+  it('no dibuja el chip cuando no hay busted', () => {
+    const grid = [entry('Ana', 0.5), entry('Bruno', 2)];
+
+    const texto = JSON.stringify(
+      formatter.formatLiveRaceEmbeds(grid, grid[0].greenLight),
+    );
+
+    expect(texto).not.toContain('Busted');
+  });
+});
