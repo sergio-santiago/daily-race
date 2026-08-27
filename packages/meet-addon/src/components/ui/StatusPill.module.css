@@ -1,0 +1,27 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.live {
+  background: rgba(225, 6, 0, 0.15);
+  color: var(--color-live);
+}
+
+.final {
+  background: rgba(0, 102, 204, 0.18);
+  color: var(--color-race);
+}
+
+.idle {
+  background: rgba(110, 112, 138, 0.18);
+  color: var(--color-text-secondary);
+}

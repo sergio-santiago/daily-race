@@ -2,12 +2,19 @@ import { Injectable } from '@nestjs/common';
 import { Race } from '../../core/entities/race.entity';
 import { StartingGridEntry } from '../../core/entities/starting-grid-entry.entity';
 import { ChampionshipStanding } from '../../core/entities/championship-standing.entity';
-import { DEFAULT_TIMEZONE } from '../../core/constants';
+import {
+  DISCORD_EMBED_COLOR,
+  formatDiffShort,
+  formatRaceDate,
+  formatRaceTime,
+  GRID_EMOJI,
+  PODIUM_EMOJI,
+  gridEntryVisualRole,
+  truncateName,
+} from '../formatting';
 
-const SEP = '\u2500';
-const HEAVY_SEP = '\u2550';
-const ELLIPSIS = '\u2026';
-const REZAGADO_RATIO = 0.1;
+const SEP = '─';
+const HEAVY_SEP = '═';
 
 // Discord hard-caps embed description at 4096 chars. We chunk the monospace
 // table body with a safety margin to leave room for the summary line on the
@@ -51,10 +58,10 @@ export class DiscordFormatterService {
     const timeStr = this.formatTime(race.greenLight);
     const driversLabel = grid.length === 1 ? 'piloto' : 'pilotos';
     const falseStarters = grid.filter((e) => e.isFalseStart);
-    let summary = `\u{1F6A5}  **${timeStr}**  \u{B7}  \u{1F3CE}\u{FE0F}  **${grid.length}** ${driversLabel}`;
+    let summary = `${GRID_EMOJI.GREEN_LIGHT}  **${timeStr}**  \u{B7}  ${GRID_EMOJI.CAR}  **${grid.length}** ${driversLabel}`;
     if (falseStarters.length > 0) {
       const fsLabel = falseStarters.length === 1 ? 'salida en falso' : 'salidas en falso';
-      summary += `  \u{B7}  \u{1F6A8}  **${falseStarters.length}** ${fsLabel}`;
+      summary += `  \u{B7}  ${GRID_EMOJI.WARNING}  **${falseStarters.length}** ${fsLabel}`;
     }
 
     const gridText = this.buildGridText(grid, race.greenLight);
@@ -64,7 +71,7 @@ export class DiscordFormatterService {
 
     return chunks.map((chunk, i) => {
       const embed: DiscordEmbed = {
-        color: 0x3498db,
+        color: DISCORD_EMBED_COLOR.RACE,
         description:
           i === 0
             ? `${summary}\n\`\`\`\n${chunk}\n\`\`\``
@@ -72,7 +79,7 @@ export class DiscordFormatterService {
       };
 
       if (i === 0) {
-        embed.title = `\u{1F3C1}  DAILY RACE  \u{2014}  \u{1F5D3}\u{FE0F}  ${dateStr}`;
+        embed.title = `${GRID_EMOJI.CHECKERED}  DAILY RACE  \u{2014}  ${GRID_EMOJI.CALENDAR}  ${dateStr}`;
       }
       if (i === chunks.length - 1 && stats) {
         embed.fields = [{ name: '', value: stats, inline: false }];
@@ -99,7 +106,7 @@ export class DiscordFormatterService {
     const racesLabel = racesCount === 1 ? 'carrera' : 'carreras';
     const driversLabel = standings.length === 1 ? 'piloto' : 'pilotos';
     const dateStr = this.formatDate(new Date());
-    const summary = `\u{1F3C1}  **${racesCount}** ${racesLabel}  \u{B7}  \u{1F3CE}\u{FE0F}  **${standings.length}** ${driversLabel}`;
+    const summary = `${GRID_EMOJI.CHECKERED}  **${racesCount}** ${racesLabel}  \u{B7}  ${GRID_EMOJI.CAR}  **${standings.length}** ${driversLabel}`;
     const legend =
       '-# **GP** grandes premios  \u{B7}  **W** victorias  \u{B7}  **PD** podios';
     const chunks = this.chunkText(gridText, DESCRIPTION_CHUNK_LIMIT);
@@ -109,14 +116,14 @@ export class DiscordFormatterService {
       const isLast = i === chunks.length - 1;
       const body = `\`\`\`\n${chunk}\n\`\`\``;
       const embed: DiscordEmbed = {
-        color: 0xffd700,
+        color: DISCORD_EMBED_COLOR.CHAMPIONSHIP,
         description:
           (isFirst ? `${summary}\n` : '') +
           body +
           (isLast ? `\n${legend}` : ''),
       };
       if (isFirst) {
-        embed.title = `\u{1F3C6}  CHAMPIONSHIP  \u{2014}  \u{1F5D3}\u{FE0F}  ${dateStr}`;
+        embed.title = `${GRID_EMOJI.TROPHY}  CHAMPIONSHIP  \u{2014}  ${GRID_EMOJI.CALENDAR}  ${dateStr}`;
       }
       if (isLast) {
         embed.footer = { text: 'Daily Race \u{2014} Secture' };
@@ -136,10 +143,10 @@ export class DiscordFormatterService {
     const timeStr = this.formatTime(greenLight);
     const driversLabel = grid.length === 1 ? 'piloto' : 'pilotos';
     const falseStarters = grid.filter((e) => e.isFalseStart);
-    let summary = `\u{1F6A5}  **${timeStr}**  \u{B7}  \u{1F3CE}\u{FE0F}  **${grid.length}** ${driversLabel}`;
+    let summary = `${GRID_EMOJI.GREEN_LIGHT}  **${timeStr}**  \u{B7}  ${GRID_EMOJI.CAR}  **${grid.length}** ${driversLabel}`;
     if (falseStarters.length > 0) {
       const fsLabel = falseStarters.length === 1 ? 'salida en falso' : 'salidas en falso';
-      summary += `  \u{B7}  \u{1F6A8}  **${falseStarters.length}** ${fsLabel}`;
+      summary += `  \u{B7}  ${GRID_EMOJI.WARNING}  **${falseStarters.length}** ${fsLabel}`;
     }
     const gridText = this.buildGridText(grid, greenLight);
     const stats = this.buildLiveStats(grid);
@@ -147,7 +154,7 @@ export class DiscordFormatterService {
 
     return chunks.map((chunk, i) => {
       const embed: DiscordEmbed = {
-        color: 0xe74c3c,
+        color: DISCORD_EMBED_COLOR.LIVE,
         description:
           i === 0
             ? `${summary}\n\`\`\`\n${chunk}\n\`\`\``
@@ -155,7 +162,7 @@ export class DiscordFormatterService {
       };
 
       if (i === 0) {
-        embed.title = `\u{1F534}  EN DIRECTO  \u{2014}  \u{1F5D3}\u{FE0F}  ${dateStr}`;
+        embed.title = `${GRID_EMOJI.LIVE}  EN DIRECTO  \u{2014}  ${GRID_EMOJI.CALENDAR}  ${dateStr}`;
       }
       if (i === chunks.length - 1 && stats) {
         embed.fields = [{ name: '', value: stats, inline: false }];
@@ -174,7 +181,7 @@ export class DiscordFormatterService {
     const busted = grid.find((e) => e.isWorstOnGrid);
     if (!busted) return '';
 
-    return `\u{1F480}  Busted: **${busted.driver.displayName}** (${this.formatDiff(busted.diffSeconds).trim()})`;
+    return `${GRID_EMOJI.BUSTED}  Busted: **${busted.driver.displayName}** (${formatDiffShort(busted.diffSeconds)})`;
   }
 
   // ── Grid building ──────────────────────────────────────────
@@ -224,7 +231,7 @@ export class DiscordFormatterService {
 
   private buildGreenLightMarker(greenLight: Date, width: number): string {
     const timeStr = this.formatTime(greenLight);
-    const label = ` \u{1F6A5}  ${timeStr}  `;
+    const label = ` ${GRID_EMOJI.GREEN_LIGHT}  ${timeStr}  `;
     const sideLen = Math.floor((width - label.length) / 2);
     return (
       SEP.repeat(sideLen) +
@@ -278,7 +285,7 @@ export class DiscordFormatterService {
     const busted = race.startingGrid.find((e) => e.isWorstOnGrid);
     if (!busted) return '';
 
-    return `\u{1F480}  Busted: **${busted.driver.displayName}** (${this.formatDiff(busted.diffSeconds).trim()})`;
+    return `${GRID_EMOJI.BUSTED}  Busted: **${busted.driver.displayName}** (${formatDiffShort(busted.diffSeconds)})`;
   }
 
   // ── Row formatting ─────────────────────────────────────────
@@ -297,68 +304,58 @@ export class DiscordFormatterService {
 
   positionLabel(entry: StartingGridEntry, cleanGridSize?: number): string {
     const numStr = String(entry.position).padStart(2);
+    const role = gridEntryVisualRole({
+      position: entry.position,
+      isFalseStart: entry.isFalseStart,
+      isWorstOnGrid: entry.isWorstOnGrid,
+      cleanGridSize,
+    });
 
-    if (entry.isFalseStart) {
-      return numStr + (entry.isWorstOnGrid ? '\u{1F480}' : '\u{26D4}');
+    switch (role) {
+      case 'busted-false-start':
+        return numStr + GRID_EMOJI.BUSTED;
+      case 'false-start':
+        return numStr + GRID_EMOJI.FALSE_START;
+      case 'podium-gold':
+        return ' 1' + PODIUM_EMOJI.GOLD;
+      case 'podium-silver':
+        return ' 2' + PODIUM_EMOJI.SILVER;
+      case 'podium-bronze':
+        return ' 3' + PODIUM_EMOJI.BRONZE;
+      case 'busted-clean':
+        return numStr + GRID_EMOJI.BUSTED;
+      case 'rezagado':
+        return numStr + GRID_EMOJI.REZAGADO;
+      case 'normal':
+      default:
+        return numStr + '  ';
     }
-
-    const n = entry.position;
-    if (n === 1) return ' 1\u{1F3C6}';
-    if (n === 2) return ' 2\u{1F948}';
-    if (n === 3) return ' 3\u{1F949}';
-    if (entry.isWorstOnGrid) return numStr + '\u{1F480}';
-    if (
-      cleanGridSize &&
-      n > cleanGridSize - Math.floor(cleanGridSize * REZAGADO_RATIO)
-    ) {
-      return numStr + '\u{1F422}';
-    }
-    return numStr + '  ';
   }
 
   championshipPosLabel(rank: number): string {
-    if (rank === 1) return ' 1\u{1F3C6}';
-    if (rank === 2) return ' 2\u{1F948}';
-    if (rank === 3) return ' 3\u{1F949}';
+    if (rank === 1) return ' 1' + PODIUM_EMOJI.GOLD;
+    if (rank === 2) return ' 2' + PODIUM_EMOJI.SILVER;
+    if (rank === 3) return ' 3' + PODIUM_EMOJI.BRONZE;
     return String(rank).padStart(2) + '  ';
   }
 
   // ── Utilities ──────────────────────────────────────────────
 
   formatDiff(diffSeconds: number): string {
-    const abs = Math.abs(diffSeconds);
-    const sign = diffSeconds < 0 ? '-' : '+';
-
-    if (abs < 60) {
-      return `${sign}${abs.toFixed(3)}`.padStart(COL_GRID_TIME);
-    }
-    const min = Math.floor(abs / 60);
-    const sec = abs % 60;
-    return `${sign}${min}:${sec.toFixed(3).padStart(6, '0')}`.padStart(COL_GRID_TIME);
+    return formatDiffShort(diffSeconds).padStart(COL_GRID_TIME);
   }
 
   truncate(str: string, max: number): string {
     if (str.length <= max) return str.padEnd(max);
-    return str.slice(0, max - 1) + ELLIPSIS;
+    return truncateName(str, max);
   }
 
   formatDate(date: Date): string {
-    return date.toLocaleDateString('es-ES', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      timeZone: DEFAULT_TIMEZONE,
-    });
+    return formatRaceDate(date);
   }
 
   formatTime(date: Date): string {
-    return date.toLocaleTimeString('es-ES', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      timeZone: DEFAULT_TIMEZONE,
-    });
+    return formatRaceTime(date);
   }
 
   chunkText(text: string, maxChars: number): string[] {

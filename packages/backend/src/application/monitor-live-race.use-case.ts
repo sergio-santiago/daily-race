@@ -37,6 +37,21 @@ interface LiveState {
   greenLight: Date;
   meetingCode: string;
   participantCount: number;
+  /** Ultimo grid calculado, cacheado para servirlo al endpoint del Meet Add-on. */
+  grid: StartingGridEntry[];
+  /** Timestamp del ultimo refresh del grid. */
+  lastUpdatedAt: Date;
+}
+
+/** Snapshot consumido por el endpoint REST del Meet Add-on. */
+export interface LiveRaceSnapshot {
+  status: 'IDLE' | 'LIVE';
+  fetchedAt: Date;
+  meetingCode: string | null;
+  greenLight: Date | null;
+  participantCount: number;
+  grid: StartingGridEntry[];
+  lastUpdatedAt: Date | null;
 }
 
 @Injectable()
@@ -72,6 +87,33 @@ export class MonitorLiveRaceUseCase {
     } else {
       await this.detectActiveMeeting();
     }
+  }
+
+  /**
+   * Devuelve el estado actual de la carrera en vivo, serializable para el
+   * endpoint REST que consume el Meet Add-on.
+   */
+  getLiveSnapshot(): LiveRaceSnapshot {
+    if (!this.liveState) {
+      return {
+        status: 'IDLE',
+        fetchedAt: new Date(),
+        meetingCode: null,
+        greenLight: null,
+        participantCount: 0,
+        grid: [],
+        lastUpdatedAt: null,
+      };
+    }
+    return {
+      status: 'LIVE',
+      fetchedAt: new Date(),
+      meetingCode: this.liveState.meetingCode,
+      greenLight: this.liveState.greenLight,
+      participantCount: this.liveState.participantCount,
+      grid: this.liveState.grid,
+      lastUpdatedAt: this.liveState.lastUpdatedAt,
+    };
   }
 
   private async detectActiveMeeting(): Promise<void> {
@@ -120,6 +162,8 @@ export class MonitorLiveRaceUseCase {
         greenLight,
         meetingCode: calendarEvent.meetingCode,
         participantCount: participants.length,
+        grid,
+        lastUpdatedAt: new Date(),
       };
 
       this.logger.log(
@@ -174,6 +218,8 @@ export class MonitorLiveRaceUseCase {
         state.greenLight,
       );
       state.participantCount = participants.length;
+      state.grid = grid;
+      state.lastUpdatedAt = new Date();
       this.logger.log(`Live update: ${participants.length} drivers`);
     } catch (error) {
       this.logger.error(`Failed to edit live message: ${error}`);

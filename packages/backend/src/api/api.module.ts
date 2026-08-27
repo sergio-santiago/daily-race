@@ -3,12 +3,13 @@ import { ApplicationModule } from '../application/application.module';
 import { GoogleModule } from '../infrastructure/google/google.module';
 import { HealthController } from './health.controller';
 import { AuthController } from './auth.controller';
+import { LiveRaceController } from './live-race.controller';
 
 @Module({
   imports: [
     ApplicationModule,
     GoogleModule, // AUTH_PROVIDER for AuthController and HealthController
   ],
-  controllers: [HealthController, AuthController],
+  controllers: [HealthController, AuthController, LiveRaceController],
 })
 export class ApiModule {}
