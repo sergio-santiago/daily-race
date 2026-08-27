@@ -41,12 +41,23 @@ Si entras a la reunion **antes de la hora programada** (green light), el sistema
 - Ejemplo: si hay 18 participantes y 3 entran antes de hora, estos ocuparan las posiciones 18, 17 y 16 (el mas madrugador en P18)
 - Las salidas en falso NO cuentan para victorias ni podios en el championship
 
+### Empates al entrar
+
+Entrar en el mismo instante pasa mas de lo que parece: en **37 de las 89 carreras** medidas, casi siempre porque quien ya esta en la sala cuando arranca la reunion recibe todo el grupo el mismo timestamp de Google Meet.
+
+Los empatados **comparten posicion y puntos**, como en cualquier deporte: dos a la vez son los dos P1, con 25 puntos cada uno, y el siguiente es P3. No hay P2.
+
+Antes lo decidia el orden en que Google Meet devolvia los participantes, que no esta especificado en ninguna parte: eso reparte 73 puntos a dedo en una temporada, y tres veces decidio quien se llevaba 25 y quien 18.
+
+Compartir la posicion infla algo los puntos del dia, pero muy poco y esta medido: **2 puntos de media por carrera afectada y 7 en el peor caso**. Los grupos grandes de empate (de 3 a 8 personas) caen todos en las posiciones 22 a 39, en la zona de asistencia donde cada uno lleva 1 punto, asi que ahi compartir no cambia nada.
+
 ### Busted
 
 Cada carrera tiene un **Busted** (marcado con calavera 💀 en Discord):
 
 - **Si hay salidas en falso**: el que entro mas temprano (el mas alejado del green light) se lleva la calavera
 - **Si NO hay salidas en falso**: el ultimo en entrar se lleva la calavera
+- **Si el extremo esta empatado**: la calavera es de todos los empatados. A igualdad de culpa no hay motivo para senalar a uno solo. De tres en adelante se cuenta el resto en vez de enumerarlo, para que la etiqueta siga cabiendo
 
 ### Championship (clasificacion general)
 
@@ -60,7 +71,11 @@ Los puntos se acumulan carrera a carrera en una clasificacion general:
 | **W** | Victorias (veces en P1 sin salida en falso) |
 | **PD** | Podios (veces en P1-P3 sin salida en falso) |
 
-La clasificacion se ordena por puntos totales de mayor a menor.
+La clasificacion se ordena por puntos totales de mayor a menor, y los empates se rompen en este orden:
+
+1. **Mas dailies asistidas.** En la F1 el desempate es el countback de resultados porque todos corren todos los GP, asi que lo unico que distingue es la calidad del resultado. Aqui la asistencia va de 1 a 82 dailies sobre 89, o sea que es el dato que de verdad distingue, y es justo el que el juego intenta mover
+2. **Menos salidas en falso.** Con los datos actuales no rompe ningun empate, pero es el criterio que expresa la puntualidad y algun dia disparara
+3. **Orden alfabetico.** No premia nada, y esta ahi por un motivo concreto: sin una clave determinista al final, los empates que quedan (23 en la temporada medida, todos de gente con puntos y asistencia identicos) caen en el orden que devuelva la base y la tabla cambia de orden entre publicaciones
 
 No hay columna de carreras disputadas (GP), y no es un olvido: la fila del embed tiene un presupuesto de 33 celdas y pasarse rompe la linea en los clientes estrechos de Discord. El numero de carreras ya sale en la linea de resumen del mensaje, y ademas es casi el mismo para todo el mundo, asi que era la columna que menos aportaba por celda ocupada.
 
