@@ -33,8 +33,16 @@ export abstract class GoogleMeetBaseAdapter implements MeetProviderPort {
           endTime: r.endTime ? new Date(r.endTime) : null,
         }));
     } catch (error) {
+      // Se propaga a proposito. Devolver [] hacia que un 429 o un timeout fuera
+      // indistinguible de "esta reunion no existe", y el monitor, al no encontrar
+      // su conference record, tiraba el estado de la carrera en curso y al tick
+      // siguiente abria un SEGUNDO mensaje en directo del mismo dia, dejando el
+      // primero congelado. Una carrera hace del orden de 180 de estas llamadas,
+      // asi que basta con que falle una. Que el tick se caiga no cuesta nada: el
+      // scheduler lo registra y el siguiente llega en 5 segundos con el estado
+      // intacto
       this.logger.error(`Failed to fetch conference records: ${error}`);
-      return [];
+      throw error;
     }
   }
 

@@ -382,6 +382,36 @@ describe('MonitorLiveRaceUseCase', () => {
       await useCase.execute();
       expect(calendarProvider.getDailyEvent).toHaveBeenCalled();
     });
+
+    it('no abre un segundo mensaje en directo cuando la consulta a Meet falla', async () => {
+      // Un 429 o un timeout consultando los conference records solia llegar
+      // disfrazado de [] y por tanto de ausencia, lo que tiraba el estado y hacia
+      // que el tick siguiente creara OTRO mensaje en directo del mismo dia. Ahora
+      // el adaptador propaga el error, el tick se cae y el estado sobrevive
+      findConferenceRecord.findByName.mockRejectedValue(
+        new Error('429 Too Many Requests'),
+      );
+
+      await expect(useCase.execute()).rejects.toThrow('429');
+
+      // El estado sigue en pie: el tick siguiente vuelve a la misma carrera en vez
+      // de salir a detectar una nueva, y no se crea un segundo mensaje
+      jest.clearAllMocks();
+      findConferenceRecord.findByName.mockResolvedValue({
+        name: 'conf/1',
+        meetingCode: 'wye-iwfu-jch',
+        startTime: new Date('2026-03-27T09:30:00.000Z'),
+        endTime: null,
+      });
+      meetProvider.getParticipants.mockResolvedValue(mockParticipants(3));
+
+      await useCase.execute();
+
+      expect(findConferenceRecord.findByName).toHaveBeenCalled();
+      expect(calendarProvider.getDailyEvent).not.toHaveBeenCalled();
+      expect(notification.createLiveRaceMessage).not.toHaveBeenCalled();
+      expect(notification.editLiveRaceMessage).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('finalization failure paths', () => {
