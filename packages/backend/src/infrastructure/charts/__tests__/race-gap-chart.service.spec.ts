@@ -413,15 +413,60 @@ describe('RaceGapChartService', () => {
       expect(svg).not.toContain('url(#silver)');
       expect(svg).toContain('url(#bronze)');
 
-      // Las dos tarjetas de oro se tinen igual: el tinte va por posicion y no
-      // por indice, que dejaba la segunda mas apagada pese a ser el mismo puesto
+      // El panel lleva una tarjeta por POSICION y no por piloto, asi que el P1
+      // compartido es UNA tarjeta que nombra a los dos, y el P3 es la segunda.
+      // Contar personas dejaba fuera del panel a empatados que la cinta si
+      // pintaba con su metal
       const tintes = [...svg.matchAll(/height="78" rx="3" fill="rgba\(([^)]+)\)"/g)].map(
         (m) => m[1],
       );
-      expect(tintes[0]).toBe(tintes[1]);
-      expect(tintes[2]).not.toBe(tintes[0]);
+      expect(tintes).toHaveLength(2);
+      expect(tintes[1]).not.toBe(tintes[0]);
+      expect(svg).toContain('Ana y Bruno');
       // Margen del podio de cero, porque los dos primeros entraron a la vez
       expect(svg).toContain('+0.000s');
+    });
+
+    it('nombra a todos los empatados del podio, que la cinta ya pinta con su metal', () => {
+      // Cuatro en el podio con dos posiciones compartidas: antes el panel
+      // cortaba los tres primeros de la lista y el cuarto desaparecia, elegido
+      // por el orden en que Meet devuelve los participantes
+      const empatados = grid([
+        { name: 'Ana', diff: 1.5, position: 1, points: 25 },
+        { name: 'Bruno', diff: 1.5, position: 1, points: 25 },
+        { name: 'Carla', diff: 4, position: 3, points: 15 },
+        { name: 'Dario', diff: 4, position: 3, points: 15 },
+        { name: 'Elena', diff: 9, position: 5, points: 10 },
+      ]);
+      const svg = service.buildSvg(empatados, GREEN_LIGHT)!;
+
+      const tintes = [...svg.matchAll(/height="78" rx="3" fill="rgba\(([^)]+)\)"/g)].map(
+        (m) => m[1],
+      );
+      expect(tintes).toHaveLength(2);
+      expect(svg).toContain('Ana y Bruno');
+      expect(svg).toContain('Carla y Dario');
+      expect(svg).not.toContain('Elena y');
+    });
+
+    it('resume el grupo cuando el podio lo comparten mas de dos', () => {
+      const empatados = grid([
+        { name: 'Ana', diff: 1.5, position: 1, points: 25 },
+        { name: 'Bruno', diff: 1.5, position: 1, points: 25 },
+        { name: 'Carla', diff: 1.5, position: 1, points: 25 },
+        { name: 'Dario', diff: 1.5, position: 1, points: 25 },
+        { name: 'Elena', diff: 9, position: 5, points: 10 },
+      ]);
+      const svg = service.buildSvg(empatados, GREEN_LIGHT)!;
+
+      // Una sola tarjeta, porque el podio entero es un unico P1
+      const tintes = [...svg.matchAll(/height="78" rx="3" fill="rgba\(([^)]+)\)"/g)].map(
+        (m) => m[1],
+      );
+      expect(tintes).toHaveLength(1);
+      expect(svg).toContain('Ana y 3 más');
+      expect(svg).not.toContain('url(#silver)');
+      expect(svg).not.toContain('url(#bronze)');
     });
 
     it('reparte la calavera entre los dos empatados', () => {

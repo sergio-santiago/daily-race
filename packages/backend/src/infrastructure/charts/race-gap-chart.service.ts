@@ -113,13 +113,30 @@ function podium(
   clean: StartingGridEntry[],
   falseStarts: StartingGridEntry[],
 ): string {
-  const winners = clean.slice(0, 3);
-  if (winners.length === 0) return noWinners(falseStarts);
+  // Una tarjeta por POSICION del podio, no por piloto. Cortar los tres primeros
+  // de la lista contaba personas: con dos en el P1 y dos en el P3 la cinta
+  // pintaba cuatro marcas metalicas y el panel nombraba solo a tres, y quien se
+  // quedaba fuera lo decidia el orden en que Meet devuelve los participantes,
+  // que es justo lo que la regla de posiciones compartidas viene a quitar.
+  //
+  // Como las posiciones del podio son a lo sumo tres, agrupar nunca da mas de
+  // tres tarjetas y el reparto del ancho no cambia. Dentro de un grupo el
+  // tiempo, los puntos y el metal son los mismos para todos, asi que la tarjeta
+  // solo tiene que nombrar a varios.
+  const groups: StartingGridEntry[][] = [];
+  for (const entry of clean) {
+    if (entry.position > 3) break;
+    const last = groups[groups.length - 1];
+    if (last != null && last[0].position === entry.position) last.push(entry);
+    else groups.push([entry]);
+  }
+  if (groups.length === 0) return noWinners(falseStarts);
 
-  const cardW = (W - PAD * 2 - CARD_GAP * (winners.length - 1)) / winners.length;
+  const cardW = (W - PAD * 2 - CARD_GAP * (groups.length - 1)) / groups.length;
   const parts: string[] = [];
 
-  winners.forEach((entry, i) => {
+  groups.forEach((group, i) => {
+    const entry = group[0];
     const x = PAD + i * (cardW + CARD_GAP);
     const metal = metalFor(entry.position)!;
 
@@ -134,7 +151,7 @@ function podium(
     const nameSize = 14.5;
     parts.push(
       text(
-        ellipsize(entry.driver.displayName, cardW - 24, nameSize, 'name', 600),
+        ellipsize(sharedNames(group), cardW - 24, nameSize, 'name', 600),
         innerX,
         PODIUM_TOP + 25,
         { size: nameSize, weight: 600, family: 'name', fill: T.ink },
@@ -461,7 +478,7 @@ function annotations(
       24 -
       textWidth(fixed.toUpperCase(), CHIP_LABEL);
     const names = ellipsize(
-      bustedNames(busted),
+      sharedNames(busted),
       Math.max(40, budget),
       CHIP_LABEL.size,
       'name',
@@ -517,8 +534,13 @@ function annotations(
  * pero la etiqueta tiene que seguir cabiendo, asi que de tres en adelante se
  * cuenta el resto en vez de enumerarlo.
  */
-function bustedNames(busted: StartingGridEntry[]): string {
-  const names = busted.map((e) => e.driver.displayName);
+/**
+ * Nombra a un grupo que comparte posicion, sea el podio o la calavera. Con mas
+ * de dos no caben todos en el ancho disponible, asi que se enuncia el primero y
+ * se cuentan los demas.
+ */
+function sharedNames(entries: StartingGridEntry[]): string {
+  const names = entries.map((e) => e.driver.displayName);
   if (names.length === 1) return names[0];
   if (names.length === 2) return `${names[0]} y ${names[1]}`;
   return `${names[0]} y ${names.length - 1} más`;
