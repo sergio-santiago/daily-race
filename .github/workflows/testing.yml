@@ -46,3 +46,27 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: npm test
+
+  # Las graficas se rasterizan con los TTF que la imagen empaqueta, porque Alpine
+  # no trae fuentes de sistema. Si el COPY de assets o la ruta a las fuentes se
+  # rompen, resvg sigue devolviendo un PNG valido pero sin texto: lint, tests y
+  # healthcheck pasan igual y el fallo aparece en Discord a la manana siguiente.
+  charts-smoke:
+    name: 🖼️ Charts smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: 🐳 Build production image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./packages/backend/Dockerfile
+          load: true
+          tags: daily-race:smoke
+          cache-from: type=gha
+
+      - name: 🖼️ Rasterizar texto acentuado en la imagen
+        run: ./scripts/smoke-charts-fonts.sh daily-race:smoke
