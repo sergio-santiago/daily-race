@@ -18,7 +18,7 @@ export interface EvolutionSeries {
 
 export interface Evolution {
   series: EvolutionSeries[];
-  /** Fechas de las carreras; hay una menos que puntos en `cumulative` */
+  /** Fechas de las carreras. Hay una menos que puntos en `cumulative` */
   raceDates: Date[];
 }
 
