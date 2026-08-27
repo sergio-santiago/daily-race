@@ -1,6 +1,6 @@
 .PHONY: install dev stop restart logs \
-       test test-watch test-cov lint build shell \
-       db-migrate db-migrate-generate db-migrate-revert db-shell \
+       test test-watch test-cov lint build shell dev-render-charts \
+       db-migrate db-migrate-generate db-migrate-revert db-shell db-seed \
        clean help
 
 # ── Core ──────────────────────────────────────────────────────
@@ -54,7 +54,13 @@ db-migrate-revert: ## Revertir ultima migracion
 db-shell: ## Abrir consola psql
 	docker compose exec db psql -U dailyrace -d dailyrace
 
+db-seed: ## Cargar el seed de desarrollo (reemplaza los datos actuales)
+	docker compose exec -T db psql -U dailyrace -d dailyrace -q -v ON_ERROR_STOP=1 < packages/backend/db/seed.sql
+
 # ── Dev (preview local, no funciona en production) ───────────
+
+dev-render-charts: ## Renderizar las graficas a PNG en disco, sin publicar (uso: make dev-render-charts DIR=charts-preview)
+	docker compose exec -w /app/packages/backend app npx ts-node -T src/cli/dev-render-charts.cli.ts $(or $(DIR),charts-preview)
 
 dev-preview-race: ## Publicar race de prueba a Discord (uso: make dev-preview-race RACE_ID=<uuid>)
 	docker compose exec -w /app/packages/backend app node dist/cli/dev-preview-race.cli.js $(RACE_ID)

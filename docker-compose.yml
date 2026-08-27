@@ -50,6 +50,8 @@ services:
       - "${BACKEND_PORT:-3001}:3001"
     volumes:
       - ./packages/backend/src:/app/packages/backend/src
+      - ./packages/backend/assets:/app/packages/backend/assets
+      - ./packages/backend/charts-preview:/app/packages/backend/charts-preview
       - google-tokens:/app/data
 
 volumes:
