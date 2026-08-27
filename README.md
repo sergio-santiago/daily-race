@@ -51,6 +51,8 @@ Antes lo decidia el orden en que Google Meet devolvia los participantes, que no 
 
 Compartir la posicion infla algo los puntos del dia, pero muy poco y esta medido: **2 puntos de media por carrera afectada y 7 en el peor caso**. Los grupos grandes de empate (de 3 a 8 personas) caen todos en las posiciones 22 a 39, en la zona de asistencia donde cada uno lleva 1 punto, asi que ahi compartir no cambia nada.
 
+En la grafica, el panel del podio lleva **una tarjeta por posicion y no por piloto**, y cuando una posicion se comparte la tarjeta nombra al grupo (`Ana y Bruno`, o `Ana y 3 mas` si son mas de dos). Contar personas dejaba fuera del panel a empatados que la cinta si pintaba con su metal, y quien se quedaba fuera lo elegia otra vez el orden de Google Meet.
+
 ### Busted
 
 Cada carrera tiene un **Busted** (marcado con calavera 💀 en Discord):
@@ -274,7 +276,7 @@ El criterio es que la imagen no repita lo que ya dice la tabla:
 
 ![Grafica de la carrera](docs/images/race.png)
 
-*Grafica de una carrera: el podio en tres tarjetas con el metal de cada posicion, la cinta de hexagonos sobre el eje de tiempos con la linea del semaforo y el chip del Busted, y las cuatro metricas al pie.*
+*Grafica de una carrera: el podio en una tarjeta por posicion con su metal, la cinta de hexagonos sobre el eje de tiempos con la linea del semaforo y el chip del Busted, y las cuatro metricas al pie.*
 
 ![Grafica del campeonato](docs/images/championship.png)
 
