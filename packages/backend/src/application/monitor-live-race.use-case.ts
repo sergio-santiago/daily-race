@@ -271,12 +271,32 @@ export class MonitorLiveRaceUseCase {
         state.conferenceRecordName,
       );
       if (existing) {
-        if (existing.startingGrid.length === 0) {
-          this.logger.warn(
-            `La carrera ${existing.conferenceRecordName} (id ${existing.id}) esta persistida sin parrilla`,
-          );
-        }
-        return existing;
+        // Guardar la carrera y guardar su parrilla son dos escrituras sin
+        // transaccion comun, asi que la primera puede colar y la segunda fallar.
+        // Devolver la carrera asi publicaba un resultado de cero pilotos y
+        // cerraba el dia para siempre, porque el tick siguiente la encontraba
+        // ya persistida y no volvia a intentarlo. Se reintenta la escritura que
+        // falto, y si tampoco se puede, no se cierra: el dia se recupera en el
+        // tick siguiente
+        if (existing.startingGrid.length > 0) return existing;
+
+        this.logger.warn(
+          `La carrera ${existing.conferenceRecordName} (id ${existing.id}) esta persistida sin parrilla, reintentando la parrilla`,
+        );
+        const grid = await this.buildResolvedGrid(state);
+        if (grid.length === 0) return null;
+
+        await this.startingGridRepository.saveAll(existing.id, grid);
+        return new Race(
+          existing.id,
+          existing.conferenceRecordName,
+          existing.meetingCode,
+          existing.greenLight,
+          existing.endTime,
+          existing.status,
+          grid,
+          existing.processedAt,
+        );
       }
 
       if (!endTime) {
@@ -286,14 +306,8 @@ export class MonitorLiveRaceUseCase {
         return null;
       }
 
-      const participants = await this.meetProvider.getParticipants(
-        state.conferenceRecordName,
-      );
-      const grid = this.buildStartingGrid.execute({
-        participants,
-        greenLight: state.greenLight,
-      });
-      const resolvedGrid = await this.resolveDrivers(grid);
+      const resolvedGrid = await this.buildResolvedGrid(state);
+      if (resolvedGrid.length === 0) return null;
 
       const savedRace = await this.raceRepository.save(
         new Race(
@@ -326,6 +340,33 @@ export class MonitorLiveRaceUseCase {
       );
       return null;
     }
+  }
+
+  /**
+   * Parrilla lista para guardar. Devuelve vacio si Meet no da participantes, que
+   * es lo que hace ProcessRaceUseCase antes de escribir nada: sin nadie dentro
+   * no hay carrera que cerrar, y grabarla PROCESSED con cero entradas publicaba
+   * una tabla vacia y sumaba una carrera de cero puntos al campeonato.
+   */
+  private async buildResolvedGrid(state: {
+    conferenceRecordName: string;
+    greenLight: Date;
+  }): Promise<StartingGridEntry[]> {
+    const participants = await this.meetProvider.getParticipants(
+      state.conferenceRecordName,
+    );
+    if (participants.length === 0) {
+      this.logger.error(
+        `Meet no devuelve participantes para ${state.conferenceRecordName}, no se persiste la carrera`,
+      );
+      return [];
+    }
+
+    const grid = this.buildStartingGrid.execute({
+      participants,
+      greenLight: state.greenLight,
+    });
+    return this.resolveDrivers(grid);
   }
 
   private async sendFinalMessage(
