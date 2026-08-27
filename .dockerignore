@@ -1,10 +1,29 @@
-node_modules/
-.git/
-.idea/
-.vscode/
+# Los patrones van con **/ porque sin el solo anclan en la raiz del contexto,
+# y lo que sobra (dist, node_modules, coverage) vive dentro de packages/
+**/node_modules/
+**/dist/
+**/coverage/
+**/*.tsbuildinfo
+**/*.md
+
+# Solo desarrollo: previsualizaciones, seed de la base y scripts de CI
+**/charts-preview/
+packages/backend/db/
+**/scripts/
+
+# Entorno y credenciales
 .env
 .env.*
-coverage/
-*.md
-.DS_Store
+credentials.json
+token.json
+
+# Datos de la base local
+pgdata/
+
+# Herramientas y sistema
+.git/
+.github/
+.idea/
+.vscode/
+**/.DS_Store
 .dockerignore
