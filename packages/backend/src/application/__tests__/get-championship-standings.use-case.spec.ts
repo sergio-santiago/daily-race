@@ -186,4 +186,87 @@ describe('GetChampionshipStandingsUseCase', () => {
     expect(result[0].wins).toBe(0);
     expect(result[0].podiums).toBe(0);
   });
+
+  describe('desempate', () => {
+    it('sube al que ha asistido a mas dailies', async () => {
+      const constante = new Driver('d1', 'g1', 'Constante', null);
+      const esporadico = new Driver('d2', 'g2', 'Esporadico', null);
+
+      driverRepository.findAll.mockResolvedValue([esporadico, constante]);
+      gridRepository.findByDriverInDateRange
+        // Esporadico: 50 pts en 2 dailies
+        .mockResolvedValueOnce([makeEntry(1, 25), makeEntry(1, 25)])
+        // Constante: los mismos 50 pts, pero en 5 dailies
+        .mockResolvedValueOnce([
+          makeEntry(4, 12),
+          makeEntry(4, 12),
+          makeEntry(4, 12),
+          makeEntry(5, 10),
+          makeEntry(11, 4),
+        ]);
+
+      const result = await useCase.execute();
+
+      expect(result[0].driver.displayName).toBe('Constante');
+      expect(result[0].racesAttended).toBe(5);
+      expect(result[0].rank).toBe(1);
+      expect(result[1].driver.displayName).toBe('Esporadico');
+      expect(result[1].rank).toBe(2);
+    });
+
+    it('a igualdad de puntos y asistencia sube el que menos se ha adelantado', async () => {
+      const puntual = new Driver('d1', 'g1', 'Puntual', null);
+      const ansioso = new Driver('d2', 'g2', 'Ansioso', null);
+
+      driverRepository.findAll.mockResolvedValue([ansioso, puntual]);
+      gridRepository.findByDriverInDateRange
+        // Ansioso: 15 pts en 3 dailies, dos de ellas adelantandose (-5 cada una)
+        .mockResolvedValueOnce([
+          makeEntry(3, -5, true),
+          makeEntry(3, -5, true),
+          makeEntry(1, 25),
+        ])
+        // Puntual: los mismos 15 pts en 3 dailies, sin adelantarse nunca
+        .mockResolvedValueOnce([
+          makeEntry(5, 10),
+          makeEntry(8, 4),
+          makeEntry(12, 1),
+        ]);
+
+      const result = await useCase.execute();
+
+      expect(result[0].driver.displayName).toBe('Puntual');
+      expect(result[0].falseStarts).toBe(0);
+      expect(result[1].driver.displayName).toBe('Ansioso');
+      expect(result[1].falseStarts).toBe(2);
+    });
+
+    it('cierra el desempate por nombre para que la tabla no baile', async () => {
+      // Con puntos, asistencia y salidas en falso identicos no queda nada que
+      // premiar, pero el orden tiene que ser el mismo en cada publicacion: sin
+      // clave final dependia del orden que devolviese el repositorio
+      const zoe = new Driver('d1', 'g1', 'Zoe', null);
+      const alba = new Driver('d2', 'g2', 'Alba', null);
+      const misma = () => [makeEntry(5, 10), makeEntry(5, 10)];
+
+      driverRepository.findAll.mockResolvedValue([zoe, alba]);
+      gridRepository.findByDriverInDateRange
+        .mockResolvedValueOnce(misma())
+        .mockResolvedValueOnce(misma());
+
+      const primero = await useCase.execute();
+
+      // El mismo caso con el repositorio devolviendo el orden contrario
+      driverRepository.findAll.mockResolvedValue([alba, zoe]);
+      gridRepository.findByDriverInDateRange
+        .mockResolvedValueOnce(misma())
+        .mockResolvedValueOnce(misma());
+
+      const segundo = await useCase.execute();
+
+      expect(primero.map((s) => s.driver.displayName)).toEqual(['Alba', 'Zoe']);
+      expect(segundo.map((s) => s.driver.displayName)).toEqual(['Alba', 'Zoe']);
+    });
+  });
+
 });
