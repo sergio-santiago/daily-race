@@ -55,7 +55,22 @@ export class GetChampionshipStandingsUseCase {
       );
     }
 
-    standings.sort((a, b) => b.totalPoints - a.totalPoints);
+    // A igualdad de puntos manda la asistencia, y luego la puntualidad. En la F1
+    // el desempate es el countback de resultados porque todos corren todos los
+    // GP, asi que lo unico que distingue es la calidad del resultado. Aqui la
+    // asistencia va de 1 a 82 dailies sobre 89, o sea que es EL dato que
+    // distingue, y es justo el que el juego intenta mover.
+    //
+    // Cierra con el nombre a proposito: sin una clave determinista al final, los
+    // 23 empates que quedan con puntos y asistencia identicos caen en el orden
+    // que devuelva el repositorio y la tabla baila cada vez que ese orden cambie.
+    standings.sort(
+      (a, b) =>
+        b.totalPoints - a.totalPoints ||
+        b.racesAttended - a.racesAttended ||
+        a.falseStarts - b.falseStarts ||
+        a.driver.displayName.localeCompare(b.driver.displayName, 'es'),
+    );
 
     return standings.map(
       (s, i) =>
