@@ -222,4 +222,116 @@ describe('BuildStartingGridUseCase', () => {
     expect(participants[0].displayName).toBe(original[0].displayName);
     expect(participants[1].displayName).toBe(original[1].displayName);
   });
+
+  describe('empates al instante', () => {
+    // Entrar en el mismo instante pasa en 37 de las 89 carreras medidas, casi
+    // siempre porque quien ya esta en la sala cuando arranca la reunion recibe
+    // todo el grupo el mismo timestamp. Antes lo decidia el orden en que Google
+    // Meet devolvia los participantes, que no esta especificado.
+
+    it('comparte la posicion y los puntos entre los que entran a la vez', () => {
+      const participants = [
+        participant('Ana', 1000),
+        participant('Bruno', 1000),
+        participant('Carla', 3000),
+      ];
+
+      const grid = useCase.execute({ participants, greenLight });
+
+      expect(grid.map((e) => e.position)).toEqual([1, 1, 3]);
+      // F1_POINTS es 0-indexado: [0] son los puntos de P1
+      expect(grid[0].points).toBe(F1_POINTS[0]);
+      expect(grid[1].points).toBe(F1_POINTS[0]);
+      // El siguiente es P3, no P2: la segunda posicion no existe
+      expect(grid[2].position).toBe(3);
+      expect(grid[2].points).toBe(F1_POINTS[2]);
+    });
+
+    it('no deja que el orden de llegada de los datos decida los puntos', () => {
+      const unOrden = [participant('Ana', 1000), participant('Bruno', 1000)];
+      const otroOrden = [participant('Bruno', 1000), participant('Ana', 1000)];
+
+      const puntos = (grid: { driver: { displayName: string }; points: number }[]) =>
+        Object.fromEntries(grid.map((e) => [e.driver.displayName, e.points]));
+
+      expect(puntos(useCase.execute({ participants: unOrden, greenLight }))).toEqual(
+        puntos(useCase.execute({ participants: otroOrden, greenLight })),
+      );
+    });
+
+    it('numera bien el grupo siguiente cuando el empate es de muchos', () => {
+      // Ocho a la vez es el maximo medido en produccion
+      const participants = [
+        ...Array.from({ length: 8 }, (_, i) => participant(`Grupo ${i + 1}`, 500)),
+        participant('Rezagado', 9000),
+      ];
+
+      const grid = useCase.execute({ participants, greenLight });
+
+      expect(grid.slice(0, 8).map((e) => e.position)).toEqual([1, 1, 1, 1, 1, 1, 1, 1]);
+      expect(grid[8].position).toBe(9);
+      expect(grid[8].points).toBe(F1_POINTS[8]);
+    });
+
+    it('comparte tambien la posicion entre salidas en falso simultaneas', () => {
+      const participants = [
+        participant('Madrugador A', -5000),
+        participant('Madrugador B', -5000),
+        participant('Puntual', 1000),
+      ];
+
+      const grid = useCase.execute({ participants, greenLight });
+      const enFalso = grid.filter((e) => e.isFalseStart);
+
+      // Dos en falso de tres: comparten la peor posicion, la 2, y dejan la 1
+      // libre para el limpio
+      expect(enFalso.map((e) => e.position)).toEqual([2, 2]);
+      expect(enFalso.every((e) => e.points === FALSE_START_PENALTY)).toBe(true);
+      expect(grid.find((e) => !e.isFalseStart)!.position).toBe(1);
+    });
+
+    it('reparte la calavera entre todos los empatados en el extremo', () => {
+      const participants = [
+        participant('Puntual', 1000),
+        participant('Tarde A', 8000),
+        participant('Tarde B', 8000),
+      ];
+
+      const grid = useCase.execute({ participants, greenLight });
+      const busted = grid.filter((e) => e.isWorstOnGrid);
+
+      expect(busted.map((e) => e.driver.displayName)).toEqual(['Tarde A', 'Tarde B']);
+    });
+
+    it('reparte la calavera entre los que se adelantaron lo mismo', () => {
+      const participants = [
+        participant('Madrugador A', -7000),
+        participant('Madrugador B', -7000),
+        participant('Menos madrugador', -1000),
+        participant('Puntual', 1000),
+      ];
+
+      const grid = useCase.execute({ participants, greenLight });
+      const busted = grid.filter((e) => e.isWorstOnGrid);
+
+      expect(busted.map((e) => e.driver.displayName)).toEqual([
+        'Madrugador A',
+        'Madrugador B',
+      ]);
+    });
+
+    it('no marca dos veces la calavera cuando el extremo no esta empatado', () => {
+      const participants = [
+        participant('Ana', 1000),
+        participant('Bruno', 1000),
+        participant('Ultimo', 9000),
+      ];
+
+      const grid = useCase.execute({ participants, greenLight });
+
+      expect(grid.filter((e) => e.isWorstOnGrid)).toHaveLength(1);
+      expect(grid.find((e) => e.isWorstOnGrid)!.driver.displayName).toBe('Ultimo');
+    });
+  });
+
 });
