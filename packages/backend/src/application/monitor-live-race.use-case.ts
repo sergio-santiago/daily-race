@@ -31,12 +31,22 @@ import { FindConferenceRecordService } from './find-conference-record.service';
 import { ConfigService } from '@nestjs/config';
 import { DAILY_MEETING_CODE, ALL_TIME_START, ALL_TIME_END } from '../core/constants';
 
+// Tope de ticks que se dedican a cerrar una carrera. Persistir es idempotente
+// (se recupera la carrera ya guardada), asi que solo limita los reintentos de
+// las notificaciones para no quedarse en bucle si Discord no responde.
+const MAX_FINALIZE_ATTEMPTS = 3;
+
 interface LiveState {
   conferenceRecordName: string;
   messageId: string;
   greenLight: Date;
   meetingCode: string;
   participantCount: number;
+  // Ticks gastados en cerrar la carrera. 0 mientras sigue en directo
+  finalizeAttempts: number;
+  // Notificaciones de cierre que ya han salido, para no repetirlas al reintentar
+  finalMessageSent: boolean;
+  championshipSent: boolean;
 }
 
 @Injectable()
@@ -120,6 +130,9 @@ export class MonitorLiveRaceUseCase {
         greenLight,
         meetingCode: calendarEvent.meetingCode,
         participantCount: participants.length,
+        finalizeAttempts: 0,
+        finalMessageSent: false,
+        championshipSent: false,
       };
 
       this.logger.log(
@@ -139,6 +152,14 @@ export class MonitorLiveRaceUseCase {
     );
 
     if (!currentRecord) {
+      // Si ya estabamos cerrando, el record puede haberse caido de la ventana
+      // reciente de Meet. Las notificaciones pendientes no dependen de el,
+      // asi que se reintentan igual con la carrera ya persistida
+      if (state.finalizeAttempts > 0) {
+        await this.finalize(null);
+        return;
+      }
+
       this.logger.warn(
         `Conference record ${state.conferenceRecordName} not found, clearing state`,
       );
@@ -147,7 +168,7 @@ export class MonitorLiveRaceUseCase {
     }
 
     if (currentRecord.endTime) {
-      await this.finalize(currentRecord);
+      await this.finalize(currentRecord.endTime);
     } else {
       await this.updateLiveMessage();
     }
@@ -180,16 +201,90 @@ export class MonitorLiveRaceUseCase {
     }
   }
 
-  private async finalize(
-    record: { name: string; endTime: Date | null },
-  ): Promise<void> {
+  // Cierra la carrera en dos fases independientes: primero persistir (idempotente)
+  // y despues notificar. Un fallo al notificar conserva liveState para reintentar
+  // en el siguiente tick, hasta agotar MAX_FINALIZE_ATTEMPTS
+  private async finalize(endTime: Date | null): Promise<void> {
+    const state = this.liveState!;
+    state.finalizeAttempts += 1;
+    const lastAttempt = state.finalizeAttempts >= MAX_FINALIZE_ATTEMPTS;
+
+    const race = await this.persistRace(endTime);
+    if (!race) {
+      if (lastAttempt) {
+        this.logger.error(
+          `Carrera ${state.conferenceRecordName} abandonada tras ${state.finalizeAttempts} intentos: no se pudo persistir, mensaje final y campeonato sin publicar`,
+        );
+        this.liveState = null;
+      }
+      return;
+    }
+
+    if (!state.finalMessageSent) {
+      state.finalMessageSent = await this.sendFinalMessage(state.messageId, race);
+    }
+
+    // El campeonato se intenta aunque el mensaje final haya fallado, y al reves
+    if (!state.championshipSent) {
+      state.championshipSent = await this.sendChampionship(race);
+    }
+
+    if (state.finalMessageSent && state.championshipSent) {
+      this.logger.log(
+        `Race finalized: ${race.startingGrid.length} drivers, P1: ${race.startingGrid[0]?.driver.displayName}`,
+      );
+      this.liveState = null;
+      return;
+    }
+
+    if (lastAttempt) {
+      if (!state.finalMessageSent) {
+        this.logger.error(
+          `Mensaje final no actualizado para la carrera ${race.conferenceRecordName} (id ${race.id}) tras ${state.finalizeAttempts} intentos: se queda publicado como EN DIRECTO`,
+        );
+      }
+      if (!state.championshipSent) {
+        this.logger.error(
+          `Campeonato no publicado para la carrera ${race.conferenceRecordName} (id ${race.id}) tras ${state.finalizeAttempts} intentos`,
+        );
+      }
+      this.liveState = null;
+      return;
+    }
+
+    this.logger.warn(
+      `Cierre incompleto de ${race.conferenceRecordName} (mensaje final: ${state.finalMessageSent ? 'ok' : 'pendiente'}, campeonato: ${state.championshipSent ? 'ok' : 'pendiente'}), reintento en el siguiente tick`,
+    );
+  }
+
+  // Devuelve la carrera guardada, recuperandola si un intento anterior ya la
+  // persistio. null si no se ha podido dejar guardada en este tick
+  private async persistRace(endTime: Date | null): Promise<Race | null> {
     const state = this.liveState!;
 
-    const alreadySaved =
-      await this.raceRepository.existsByConferenceRecordName(record.name);
+    try {
+      const existing = await this.raceRepository.findByConferenceRecordName(
+        state.conferenceRecordName,
+      );
+      if (existing) {
+        if (existing.startingGrid.length === 0) {
+          this.logger.warn(
+            `La carrera ${existing.conferenceRecordName} (id ${existing.id}) esta persistida sin parrilla`,
+          );
+        }
+        return existing;
+      }
 
-    if (!alreadySaved) {
-      const participants = await this.meetProvider.getParticipants(record.name);
+      if (!endTime) {
+        this.logger.error(
+          `No se puede cerrar la carrera ${state.conferenceRecordName}: sin registro persistido y sin hora de fin`,
+        );
+        return null;
+      }
+
+      const participants = await this.meetProvider.getParticipants(
+        state.conferenceRecordName,
+      );
       const grid = this.buildStartingGrid.execute({
         participants,
         greenLight: state.greenLight,
@@ -199,10 +294,10 @@ export class MonitorLiveRaceUseCase {
       const savedRace = await this.raceRepository.save(
         new Race(
           '',
-          record.name,
+          state.conferenceRecordName,
           state.meetingCode,
           state.greenLight,
-          record.endTime!,
+          endTime,
           RaceStatus.PROCESSED,
           resolvedGrid,
           new Date(),
@@ -211,7 +306,7 @@ export class MonitorLiveRaceUseCase {
 
       await this.startingGridRepository.saveAll(savedRace.id, resolvedGrid);
 
-      const race = new Race(
+      return new Race(
         savedRace.id,
         savedRace.conferenceRecordName,
         savedRace.meetingCode,
@@ -221,28 +316,44 @@ export class MonitorLiveRaceUseCase {
         resolvedGrid,
         savedRace.processedAt,
       );
-
-      await this.notification.editLiveRaceMessageAsFinal(
-        state.messageId,
-        race,
+    } catch (error) {
+      this.logger.error(
+        `Fallo al persistir la carrera ${state.conferenceRecordName}: ${error}`,
       );
+      return null;
+    }
+  }
 
+  private async sendFinalMessage(
+    messageId: string,
+    race: Race,
+  ): Promise<boolean> {
+    try {
+      await this.notification.editLiveRaceMessageAsFinal(messageId, race);
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Fallo al editar el mensaje final de la carrera ${race.conferenceRecordName}: ${error}`,
+      );
+      return false;
+    }
+  }
+
+  private async sendChampionship(race: Race): Promise<boolean> {
+    try {
       const standings = await this.getChampionship.execute();
       const allRaces = await this.raceRepository.findByDateRange(
         ALL_TIME_START,
         ALL_TIME_END,
       );
-      await this.notification.publishChampionshipStandings(
-        standings,
-        allRaces.length,
+      await this.notification.publishChampionshipStandings(standings, allRaces);
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Fallo al publicar el campeonato de la carrera ${race.conferenceRecordName}: ${error}`,
       );
-
-      this.logger.log(
-        `Race finalized: ${resolvedGrid.length} drivers, P1: ${resolvedGrid[0]?.driver.displayName}`,
-      );
+      return false;
     }
-
-    this.liveState = null;
   }
 
   private async resolveDrivers(
