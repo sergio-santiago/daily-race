@@ -21,6 +21,7 @@ COPY packages/backend/package.json ./packages/backend/
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build /app/packages/backend/dist ./packages/backend/dist
+COPY --from=build /app/packages/backend/assets ./packages/backend/assets
 
 EXPOSE 3001
 
