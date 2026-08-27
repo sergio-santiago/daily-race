@@ -3,11 +3,9 @@ node_modules/
 
 # Build output
 dist/
+.next/
+next-env.d.ts
 *.tsbuildinfo
-**/*.d.ts
-**/*.d.ts.map
-**/src/**/*.js
-**/src/**/*.js.map
 
 # Environment
 .env
@@ -33,3 +31,6 @@ Thumbs.db
 
 # Docker
 pgdata/
+
+# Previsualizaciones locales de las graficas
+charts-preview/
