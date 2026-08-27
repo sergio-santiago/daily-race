@@ -44,6 +44,8 @@ export class GoogleMeetServiceAccountAdapter extends GoogleMeetBaseAdapter {
   ): Promise<ConferenceRecordData[]> {
     const seen = new Set<string>();
     const allRecords: ConferenceRecordData[] = [];
+    let lastError: unknown = null;
+    let failed = 0;
 
     for (const client of this.meetClients) {
       try {
@@ -65,7 +67,18 @@ export class GoogleMeetServiceAccountAdapter extends GoogleMeetBaseAdapter {
         }
       } catch (error) {
         this.logger.warn(`Failed to fetch conference records: ${error}`);
+        lastError = error;
+        failed += 1;
       }
+    }
+
+    // Si algun cliente contesto, lo que traiga vale: cada identidad suplantada ve
+    // las reuniones a las que esta invitada, y por eso se consultan todas. Pero si
+    // fallaron TODAS no sabemos nada, y devolver [] equivale a afirmar que no hay
+    // reunion: eso le hacia tirar el estado al monitor y abrir un segundo mensaje
+    // en directo. Sin informacion, mejor caerse y reintentar en el tick siguiente
+    if (failed === this.meetClients.length && allRecords.length === 0) {
+      throw lastError;
     }
 
     return allRecords;

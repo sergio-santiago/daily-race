@@ -160,6 +160,10 @@ export class MonitorLiveRaceUseCase {
         return;
       }
 
+      // Aqui solo se llega con una ausencia real: si la consulta a Meet falla, el
+      // adaptador propaga el error, el tick se cae y el estado se queda intacto
+      // para el siguiente. Antes un fallo pasajero llegaba disfrazado de ausencia
+      // y esta linea abria la puerta a un segundo mensaje en directo
       this.logger.warn(
         `Conference record ${state.conferenceRecordName} not found, clearing state`,
       );
