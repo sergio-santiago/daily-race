@@ -195,12 +195,26 @@ function limitRaces(greenLight: Date): [string, StartingGridEntry[]][] {
         }),
       ),
     ],
-    // Empate exacto de toda la parrilla: entran en bloque al admitirlos
+    // Empate exacto de toda la parrilla: entran en bloque al admitirlos, asi que
+    // comparten posicion y puntos. Los nueve son P1
     [
       'limite-empate-absoluto',
       Array.from({ length: 9 }, (_, i) =>
-        entryAt(`Piloto ${i + 1}`, i + 1, 3.5, greenLight, { points: F1_POINTS[i] ?? 1 }),
+        entryAt(`Piloto ${i + 1}`, 1, 3.5, greenLight, { points: F1_POINTS[0] }),
       ),
+    ],
+    // Podio compartido: dos entran a la vez y se llevan los dos el oro, asi que
+    // no hay plata y el siguiente es P3. Y la calavera tambien es compartida
+    [
+      'limite-podio-compartido',
+      [
+        entryAt('Silvia Merino', 1, 0.42, greenLight, { points: F1_POINTS[0] }),
+        entryAt('Beatriz Nadal', 1, 0.42, greenLight, { points: F1_POINTS[0] }),
+        entryAt('Mireia Solana', 3, 1.9, greenLight, { points: F1_POINTS[2] }),
+        entryAt('Paula Rueda', 4, 12.5, greenLight, { points: F1_POINTS[3] }),
+        entryAt('Rocío Vargas', 5, 74, greenLight, { points: F1_POINTS[4], worst: true }),
+        entryAt('Aitor Abad', 5, 74, greenLight, { points: F1_POINTS[4], worst: true }),
+      ],
     ],
     // Solo dos pilotos, el minimo para que la grafica tenga sentido
     ['limite-dos-pilotos', clean(['Silvia Merino', 'Beatriz Nadal'], [0.2, 900])],
