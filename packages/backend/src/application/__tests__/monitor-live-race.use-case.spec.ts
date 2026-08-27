@@ -462,6 +462,76 @@ describe('MonitorLiveRaceUseCase', () => {
       );
     });
 
+    it('reintenta la parrilla cuando la carrera quedo guardada sin ella', async () => {
+      const warnSpy = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+
+      // save() cuela y saveAll() falla: la carrera queda en base sin parrilla, que
+      // es el estado que dejan dos escrituras sin transaccion comun
+      gridRepository.saveAll.mockRejectedValueOnce(new Error('unique violation'));
+      await useCase.execute();
+
+      expect(notification.editLiveRaceMessageAsFinal).not.toHaveBeenCalled();
+
+      // La carrera ya esta persistida, pero vacia. El tick siguiente no puede
+      // publicarla como esta: tiene que reescribir la parrilla que falto
+      storedRace = new Race(
+        'race-1',
+        'conf/1',
+        'wye-iwfu-jch',
+        new Date('2026-03-27T09:30:00.000Z'),
+        endedRecord.endTime,
+        storedRace!.status,
+        [],
+        storedRace!.processedAt,
+      );
+      jest.clearAllMocks();
+      findConferenceRecord.findByName.mockResolvedValue(endedRecord);
+      meetProvider.getParticipants.mockResolvedValue(mockParticipants(2));
+      driverRepository.upsert.mockImplementation(
+        async (d) => new Driver('d1', d.googleId, d.displayName, d.email),
+      );
+      raceRepository.findByConferenceRecordName.mockImplementation(
+        async () => storedRace,
+      );
+
+      await useCase.execute();
+
+      expect(gridRepository.saveAll).toHaveBeenCalledWith('race-1', expect.any(Array));
+      expect(gridRepository.saveAll.mock.calls[0][1]).toHaveLength(2);
+      // Y el mensaje final sale con pilotos, no con la tabla vacia
+      const publicada = notification.editLiveRaceMessageAsFinal.mock.calls[0][1];
+      expect(publicada.startingGrid).toHaveLength(2);
+      warnSpy.mockRestore();
+    });
+
+    it('no cierra la carrera si Meet no devuelve participantes', async () => {
+      const errorSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+      meetProvider.getParticipants.mockResolvedValue([]);
+
+      await useCase.execute();
+
+      // Nada escrito y nada publicado: grabarla PROCESSED con cero entradas
+      // enseñaba una tabla vacia y sumaba una carrera de cero puntos al campeonato
+      expect(raceRepository.save).not.toHaveBeenCalled();
+      expect(gridRepository.saveAll).not.toHaveBeenCalled();
+      expect(notification.editLiveRaceMessageAsFinal).not.toHaveBeenCalled();
+      expect(notification.publishChampionshipStandings).not.toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalled();
+
+      // Y el dia no se pierde: en cuanto Meet responde, se cierra
+      jest.clearAllMocks();
+      meetProvider.getParticipants.mockResolvedValue(mockParticipants(2));
+      await useCase.execute();
+
+      expect(raceRepository.save).toHaveBeenCalledTimes(1);
+      expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
+      errorSpy.mockRestore();
+    });
+
     it('should keep the happy path intact: one notification each and state cleared', async () => {
       const errorSpy = jest
         .spyOn(Logger.prototype, 'error')
