@@ -1,0 +1,121 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100vh;
+  padding: 16px;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 22px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.subtitle {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sectionHeader {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.spacerSm {
+  height: 8px;
+}
+
+.spacerMd {
+  height: 16px;
+}
+
+.errorBanner {
+  background: rgba(255, 48, 48, 0.12);
+  border: 1px solid var(--color-diff-false-start);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--color-diff-false-start);
+}
+
+.muted {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.cta {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: var(--color-live);
+  color: #ffffff;
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.cta:hover {
+  filter: brightness(1.1);
+}
+
+.cta:disabled {
+  background: var(--surface-elevated);
+  color: var(--color-text-tertiary);
+  cursor: not-allowed;
+}
+
+.idle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px 16px;
+  gap: 12px;
+}
+
+.idleIcon {
+  font-size: 48px;
+}
+
+.idleTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.idleBody {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  max-width: 240px;
+}

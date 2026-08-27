@@ -1,6 +1,7 @@
 .PHONY: install dev stop restart logs \
        test test-watch test-cov lint build shell \
        db-migrate db-migrate-generate db-migrate-revert db-shell \
+       meet-addon-install meet-addon-dev meet-addon-build meet-addon-typecheck \
        clean help
 
 # ── Core ──────────────────────────────────────────────────────
@@ -61,6 +62,20 @@ dev-preview-race: ## Publicar race de prueba a Discord (uso: make dev-preview-ra
 
 dev-preview-championship: ## Publicar championship de prueba a Discord
 	docker compose exec -w /app/packages/backend app node dist/cli/dev-preview-championship.cli.js
+
+# ── Meet Add-on (frontend Next.js, corre en host) ────────────
+
+meet-addon-install: ## Instalar dependencias del Meet Add-on
+	cd packages/meet-addon && npm install
+
+meet-addon-dev: ## Levantar dev server del Meet Add-on en https://localhost:3002
+	cd packages/meet-addon && npm run dev
+
+meet-addon-build: ## Build estatico del Meet Add-on (output en out/)
+	cd packages/meet-addon && npm run build
+
+meet-addon-typecheck: ## Typecheck del Meet Add-on
+	cd packages/meet-addon && npm run typecheck
 
 # ── Utilidades ────────────────────────────────────────────────
 

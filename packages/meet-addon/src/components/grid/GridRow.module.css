@@ -1,0 +1,106 @@
+.row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  transition: background 200ms ease, border-color 200ms ease, transform 200ms ease;
+}
+
+.row + .row {
+  margin-top: 6px;
+}
+
+.row.highlight {
+  border-color: var(--color-live);
+  background: linear-gradient(90deg, rgba(225, 6, 0, 0.08), var(--surface));
+}
+
+.position {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--surface-elevated);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.position.gold {
+  background: linear-gradient(135deg, #FFD700, #B8860B);
+  color: #1C1C1E;
+}
+.position.silver {
+  background: linear-gradient(135deg, #E5E5E5, #909090);
+  color: #1C1C1E;
+}
+.position.bronze {
+  background: linear-gradient(135deg, #CD7F32, #8B4513);
+  color: #1C1C1E;
+}
+.position.busted {
+  background: #1C1C1E;
+  color: var(--color-text-secondary);
+}
+.position.falseStart {
+  background: rgba(255, 107, 53, 0.18);
+  color: var(--color-false-start);
+}
+
+.driver {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.label {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.points {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 14px;
+  text-align: right;
+  min-width: 56px;
+}
+
+.points.positive {
+  color: var(--color-points-positive);
+}
+.points.negative {
+  color: var(--color-points-negative);
+}
+
+.diff {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
+  text-align: right;
+  min-width: 80px;
+  color: var(--color-text-secondary);
+}
+
+.diff.late {
+  color: var(--color-diff-late);
+}
+.diff.falseStart {
+  color: var(--color-diff-false-start);
+}

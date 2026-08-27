@@ -1,0 +1,20 @@
+{
+  "addOns": {
+    "common": {
+      "name": "Daily Race",
+      "logoUrl": "https://daily-race.secture.com/logo-256.png",
+      "useLocaleFromApp": true
+    },
+    "meet": {
+      "supportsCollaborationHost": true,
+      "supportsScreensharing": false,
+      "darkModeLogoUrl": "https://daily-race.secture.com/logo-256-dark.png",
+      "addOnOrigins": [
+        "https://daily-race.secture.com",
+        "https://localhost:3002"
+      ],
+      "sidePanelUrl": "https://daily-race.secture.com/sidepanel/",
+      "mainStageUrl": "https://daily-race.secture.com/mainstage/"
+    }
+  }
+}

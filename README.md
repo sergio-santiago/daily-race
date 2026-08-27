@@ -2,9 +2,13 @@
 
 Sistema de gamificacion de la daily standup de Secture con tematica de carreras de Formula 1.
 
-Cada dia laborable, el sistema monitoriza en tiempo real la reunion de Google Meet de la daily. Cuando detecta que la reunion esta activa, publica un grid en directo en Discord que se actualiza conforme van entrando los participantes. Al terminar la reunion, persiste los resultados, calcula puntos con el sistema de puntuacion F1 y publica la clasificacion general del campeonato.
+Cada dia laborable, el sistema monitoriza en tiempo real la reunion de Google Meet de la daily. Cuando detecta que la reunion esta activa, publica un grid en directo (en **Discord**, **Google Chat**, o ambos durante la transicion) que se actualiza conforme van entrando los participantes. Al terminar la reunion, persiste los resultados, calcula puntos con el sistema de puntuacion F1 y publica la clasificacion general del campeonato.
+
+Adicionalmente, un **Google Meet Add-on** muestra el grid en directo dentro de la propia llamada de Meet (panel lateral + main stage compartido), para los participantes en la daily.
 
 Todo es automatico — no hay que hacer nada manualmente.
+
+> **Migracion en curso**: el proyecto se construyo originalmente sobre Discord. Esta migrando a Google Workspace (Chat + Meet Add-on) por adopcion oficial en la empresa. Detalle del plan: `docs/migration-discord-to-google.md`. Diseno UX: `docs/ux-design-google.md`. Setup: `docs/google-chat-setup.md`, `docs/meet-addon-setup.md`.
 
 ## Como funciona el juego
 
@@ -73,14 +77,19 @@ El sistema monitoriza la reunion de Google Meet:
 
 Solo detecta reuniones que empezaron dentro de **±30 minutos** de la hora programada del evento.
 
-### Canales de Discord
+### Canales de notificacion
 
-Dos canales con webhooks independientes:
+Daily Race publica en dos canales (Discord, Google Chat, o ambos en transicion):
 
-- **#race-day**: grid de cada carrera con posiciones, puntos, tiempos y Busted
-- **#championship**: clasificacion general acumulada
+- **race-day**: grid de cada carrera con posiciones, puntos, tiempos y Busted
+- **championship**: clasificacion general acumulada
 
-Todo se publica automaticamente al finalizar cada carrera.
+El backend selecciona el destino con la env var `NOTIFICATION_PROVIDER`:
+- `discord` (default historico): solo Discord webhooks.
+- `google-chat`: solo Google Chat App (Service Account + scope `chat.bot`).
+- `dual`: ambos a la vez. Usado durante la transicion para validar Google Chat sin perder Discord.
+
+Todo se publica automaticamente al finalizar cada carrera. El cambio de proveedor es runtime: `make restart` tras editar el `.env`.
 
 ## Terminologia
 
@@ -178,7 +187,8 @@ Los endpoints `/auth/google` y `/auth/google/callback` estan **protegidos en pro
 
 ```
 packages/
-  backend/     NestJS + TypeScript (arquitectura hexagonal)
+  backend/      NestJS + TypeScript (arquitectura hexagonal)
+  meet-addon/   Next.js 15 + React 19 (frontend del Google Meet Add-on)
 ```
 
 ### Backend (hexagonal)
@@ -216,13 +226,28 @@ PostgreSQL con 3 tablas:
 
 Las migraciones se ejecutan automaticamente al arrancar la aplicacion (`migrationsRun: true`).
 
-### Discord
+### Notificaciones
 
-Los mensajes se formatean como tablas monospace dentro de embeds de Discord:
+El puerto `NotificationPort` es la abstraccion comun. Implementaciones disponibles:
 
-- **Race**: columnas Pos, Piloto, Pts, Tiempo. Emojis para podio, salidas en falso y Busted
-- **Championship**: columnas Pos, Piloto, Pts, GP, W, PD. Leyenda al pie
-- **Live**: mismo formato que race pero con color rojo y footer "EN DIRECTO"
+- **`infrastructure/discord/`** · webhooks de Discord con embeds monospace (estado historico).
+- **`infrastructure/google-chat/`** · Chat App con Service Account, mensajes Cards V2 con podio, parrilla y stats. Soporta edicion live (`spaces.messages.patch`).
+- **`infrastructure/notification/`** · `NotificationModule.forRoot()` selecciona el adapter segun `NOTIFICATION_PROVIDER`. En modo `dual`, `MulticastNotificationAdapter` hace fan-out tolerante a fallos con messageId compuesto opaco.
+
+#### Discord (estado historico)
+Tablas monospace dentro de embeds. Vease `infrastructure/discord/discord-formatter.service.ts`.
+
+#### Google Chat (estado objetivo)
+Cards V2 con `decoratedText` por fila (no monoespaciado, mejor render mobile), grid widget para el podio, secciones colapsables para parrillas grandes. Mantiene el live-edit cada 5s. Detalle del diseno: `docs/ux-design-google.md`.
+
+### Meet Add-on
+
+`packages/meet-addon` es un frontend Next.js 15 que se incrusta en Google Meet:
+
+- **Side panel** privado por participante (`/sidepanel`). Estado IDLE / LIVE.
+- **Main stage** compartido cuando alguien lanza la actividad (`/mainstage`).
+
+Consume el endpoint `GET /api/live-race/current` del backend cada 2.5s. Build estatico, hospedable en cualquier CDN HTTPS.
 
 ### Docker
 
@@ -288,9 +313,11 @@ El deploy genera un tag semantico automatico desde los mensajes de commit y publ
 ## Stack
 
 - **Backend**: NestJS 11 + TypeScript 5.7 (strict)
+- **Frontend (Meet Add-on)**: Next.js 15 + React 19 + TypeScript 5.7
 - **Base de datos**: PostgreSQL 16
-- **APIs**: Google Meet REST API v2, Google Calendar API v3
-- **Notificaciones**: Discord webhooks
+- **APIs**: Google Meet REST API v2, Google Calendar API v3, Google Chat API v1
+- **Meet Add-on SDK**: `@googleworkspace/meet-addons` 1.2.x
+- **Notificaciones**: Discord webhooks + Google Chat App (transicion en curso)
 - **Contenedores**: Docker (multi-stage) + Docker Compose
-- **Testing**: Jest (91 tests)
+- **Testing**: Jest (155 tests)
 - **CI/CD**: GitHub Actions + GHCR + SSH deploy
