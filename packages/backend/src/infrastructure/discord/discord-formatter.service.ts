@@ -21,7 +21,26 @@ const REZAGADO_RATIO = 0.1;
 //   - total row width <=33 cells so character-wrap doesn't trigger either
 const NBSP = '\u00a0';
 const WJ = '\u2060';
+const ZWJ = '\u200d';
 const nbspify = (s: string): string => s.replace(/ /g, NBSP);
+
+// Nombre de recambio cuando el saneado se lo come entero (por ejemplo un
+// displayName que solo son backticks)
+const UNKNOWN_NAME = '?';
+
+// Tope del nombre en el chip de Busted, que va fuera del bloque de codigo
+const BUSTED_NAME_MAX = 40;
+
+// Medida de ancho en celdas. Sin esto un nombre con emoji cuenta como un
+// caracter pero se dibuja como dos celdas y desborda la columna.
+const GRAPHEME_SEGMENTER = new Intl.Segmenter('es', {
+  granularity: 'grapheme',
+});
+// Formato invisible, marcas combinantes y selectores de variacion: 0 celdas
+const ZERO_WIDTH_RE = /^[\p{Cf}\p{Mn}\p{Me}\u{FE00}-\u{FE0F}]$/u;
+// Emoji, simbolos y bloques CJK: 2 celdas
+const WIDE_RE =
+  /^[\u{1100}-\u{115F}\u{2600}-\u{27BF}\u{2E80}-\u{A4CF}\u{AC00}-\u{D7A3}\u{F900}-\u{FAFF}\u{FF00}-\u{FF60}\u{1F000}-\u{1FAFF}]$/u;
 
 // Discord hard-caps embed description at 4096 chars. We chunk the monospace
 // table body with a safety margin to leave room for the summary line on the
@@ -34,11 +53,11 @@ const COL_POS = 4;
 const COL_NAME = 13;
 const COL_GAP = '  ';
 
-// Daily race grid columns — total row: 4+2+13+2+3+2+7 = 33 cells
+// Daily race grid columns, total row: 4+2+13+2+3+2+7 = 33 cells
 const COL_GRID_PTS = 3;
 const COL_GRID_TIME = 7;
 
-// Championship table columns — total row: 4+2+13+2+4+1+3+1+3 = 33 cells
+// Championship table columns, total row: 4+2+13+2+4+1+3+1+3 = 33 cells
 // GP column dropped: it equals races attended (already in the summary line)
 // and is ≈uniform across drivers, so it adds little signal at this width.
 const COL_CHAMP_PTS = 4;
@@ -53,6 +72,7 @@ export interface DiscordEmbed {
   fields?: { name: string; value: string; inline: boolean }[];
   footer?: { text: string };
   timestamp?: string;
+  image?: { url: string };
 }
 
 @Injectable()
@@ -187,7 +207,7 @@ export class DiscordFormatterService {
     const busted = grid.find((e) => e.isWorstOnGrid);
     if (!busted) return '';
 
-    return `\u{1F480}  Busted: **${busted.driver.displayName}** (${this.formatDiff(busted.diffSeconds).trim()})`;
+    return this.bustedChip(busted.driver.displayName, busted.diffSeconds);
   }
 
   // ── Grid building ──────────────────────────────────────────
@@ -249,7 +269,7 @@ export class DiscordFormatterService {
   private buildChampionshipTable(standings: ChampionshipStanding[]): string {
     const rows = standings.map((s) => {
       const pos = this.championshipPosLabel(s.rank);
-      const name = this.truncate(s.driver.displayName, COL_NAME);
+      const name = this.safeName(s.driver.displayName, COL_NAME);
       const pts = String(s.totalPoints).padStart(COL_CHAMP_PTS);
       const wins = String(s.wins).padStart(COL_CHAMP_W);
       const podiums = String(s.podiums).padStart(COL_CHAMP_PODIUM);
@@ -287,7 +307,7 @@ export class DiscordFormatterService {
     const busted = race.startingGrid.find((e) => e.isWorstOnGrid);
     if (!busted) return '';
 
-    return `\u{1F480}  Busted: **${busted.driver.displayName}** (${this.formatDiff(busted.diffSeconds).trim()})`;
+    return this.bustedChip(busted.driver.displayName, busted.diffSeconds);
   }
 
   // ── Row formatting ─────────────────────────────────────────
@@ -297,7 +317,7 @@ export class DiscordFormatterService {
     cleanGridSize?: number,
   ): string {
     const pos = this.positionLabel(entry, cleanGridSize);
-    const name = this.truncate(entry.driver.displayName, COL_NAME);
+    const name = this.safeName(entry.driver.displayName, COL_NAME);
     const pts = String(entry.points).padStart(COL_GRID_PTS);
     const diff = this.formatDiff(entry.diffSeconds);
 
@@ -332,23 +352,130 @@ export class DiscordFormatterService {
     return String(rank).padStart(2) + '  ';
   }
 
+  // ── Sanitizing ─────────────────────────────────────────────
+
+  /**
+   * Un displayName con tres backticks cierra el bloque de codigo y corrompe el
+   * resto de la tabla, un salto de linea descuadra la parrilla y un override
+   * bidi (U+202E) da la vuelta a la fila entera. Se sanea una sola vez al
+   * entrar, antes de medir el ancho de columna.
+   */
+  sanitizeName(name: string | null | undefined): string {
+    const cleaned = (name ?? '')
+      .replace(/`/g, '')
+      // Controles (incluye \n, \r, \t) a espacio, para no pegar dos palabras
+      .replace(/\p{Cc}/gu, ' ')
+      // Formato invisible fuera, salvo el ZWJ que compone emojis compuestos
+      .replace(/\p{Cf}/gu, (c) => (c === ZWJ ? c : ''))
+      .replace(/\s+/g, ' ')
+      .trim();
+    return cleaned.length > 0 ? cleaned : UNKNOWN_NAME;
+  }
+
+  /**
+   * Para el texto que va FUERA del bloque de codigo (el chip de Busted), donde
+   * Discord si interpreta markdown.
+   */
+  escapeMarkdown(text: string): string {
+    return text.replace(/[\\`*_~|[\]()]/g, (c) => `\\${c}`);
+  }
+
+  private safeName(name: string | null | undefined, max: number): string {
+    return this.truncate(this.sanitizeName(name), max);
+  }
+
+  private bustedChip(name: string, diffSeconds: number): string {
+    // El chip va fuera del bloque de codigo, asi que no lo ata la columna de 13,
+    // pero se acota igual: el campo del embed tiene un tope de 1024 caracteres y
+    // escapar markdown puede duplicar cada caracter
+    const capped = this.truncate(this.sanitizeName(name), BUSTED_NAME_MAX).trimEnd();
+    const label = this.escapeMarkdown(capped);
+    return `\u{1F480}  Busted: **${label}** (${this.formatDiff(diffSeconds).trim()})`;
+  }
+
   // ── Utilities ──────────────────────────────────────────────
 
+  /**
+   * Por debajo del minuto se conservan los milisegundos, que es donde se decide
+   * la carrera. A partir de un minuto se recorta a mm:ss: el milisegundo ya no
+   * aporta nada y "+1:00.500" (9 celdas) desbordaba la columna de 7, lo que
+   * rompia la linea en clientes estrechos. "+32:21" cabe de sobra.
+   */
   formatDiff(diffSeconds: number): string {
     const abs = Math.abs(diffSeconds);
     const sign = diffSeconds < 0 ? '-' : '+';
+    const body = abs < 60 ? abs.toFixed(3) : this.formatMinutesSeconds(abs);
+    const text = `${sign}${body}`;
 
-    if (abs < 60) {
-      return `${sign}${abs.toFixed(3)}`.padStart(COL_GRID_TIME);
-    }
-    const min = Math.floor(abs / 60);
-    const sec = abs % 60;
-    return `${sign}${min}:${sec.toFixed(3).padStart(6, '0')}`.padStart(COL_GRID_TIME);
+    // Red de seguridad: por encima de 999 minutos (datos imposibles en una
+    // daily) se recorta en seco antes que desbordar la columna.
+    return (
+      text.length > COL_GRID_TIME ? text.slice(0, COL_GRID_TIME) : text
+    ).padStart(COL_GRID_TIME);
   }
 
+  private formatMinutesSeconds(abs: number): string {
+    // Se redondea el total en segundos, no cada parte, para que 119,7 s de
+    // 2:00 y no de 1:60
+    const totalSeconds = Math.round(abs);
+    const min = Math.floor(totalSeconds / 60);
+    const sec = totalSeconds % 60;
+    return `${min}:${String(sec).padStart(2, '0')}`;
+  }
+
+  /**
+   * Recorta y rellena a `max` CELDAS, no a `max` caracteres. Un emoji en el
+   * nombre ocupa dos celdas, asi que contar caracteres desbordaba la columna y
+   * con ella el presupuesto de 33 de la fila. Se corta por grafema para no
+   * partir un par surrogate (un surrogate huerfano hace que Discord conteste
+   * 400) ni una secuencia de emoji unida por ZWJ.
+   */
   truncate(str: string, max: number): string {
-    if (str.length <= max) return str.padEnd(max);
-    return str.slice(0, max - 1) + ELLIPSIS;
+    const clusters = this.graphemes(str);
+    const total = clusters.reduce((sum, g) => sum + this.clusterCells(g), 0);
+    if (total <= max) return str + ' '.repeat(max - total);
+
+    // Se reserva 1 celda para los puntos suspensivos
+    let width = 0;
+    const kept: string[] = [];
+    for (const cluster of clusters) {
+      const cells = this.clusterCells(cluster);
+      if (width + cells > max - 1) break;
+      width += cells;
+      kept.push(cluster);
+    }
+    return (
+      kept.join('') + ELLIPSIS + ' '.repeat(Math.max(0, max - width - 1))
+    );
+  }
+
+  /** Ancho en celdas de la fuente monoespaciada de un bloque de codigo */
+  visualWidth(text: string): number {
+    return this.graphemes(text).reduce(
+      (sum, cluster) => sum + this.clusterCells(cluster),
+      0,
+    );
+  }
+
+  private graphemes(str: string): string[] {
+    return [...GRAPHEME_SEGMENTER.segment(str)].map((s) => s.segment);
+  }
+
+  private clusterCells(cluster: string): number {
+    // Se suma cada punto de codigo del grafema en vez de quedarse con el mas
+    // ancho: un cliente que no compone la secuencia ZWJ dibuja los tres emojis
+    // de una familia por separado (6 celdas). Pasarse de ancho deja la fila mas
+    // estrecha de lo necesario, quedarse corto le rompe la linea.
+    let width = 0;
+    for (const char of cluster) {
+      width += this.charCells(char);
+    }
+    return width;
+  }
+
+  private charCells(char: string): number {
+    if (ZERO_WIDTH_RE.test(char)) return 0;
+    return WIDE_RE.test(char) ? 2 : 1;
   }
 
   formatDate(date: Date): string {

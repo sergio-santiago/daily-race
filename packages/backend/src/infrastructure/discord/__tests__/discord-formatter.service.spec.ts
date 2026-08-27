@@ -3,6 +3,7 @@ import { Race, RaceStatus } from '../../../core/entities/race.entity';
 import { Driver } from '../../../core/entities/driver.entity';
 import { StartingGridEntry } from '../../../core/entities/starting-grid-entry.entity';
 import { ChampionshipStanding } from '../../../core/entities/championship-standing.entity';
+import { formatDiff as formatDiffGrafica } from '../../charts/scale';
 
 function makeEntry(
   position: number,
@@ -197,7 +198,22 @@ describe('DiscordFormatterService', () => {
     });
 
     it('should format diff over 60s as min:sec', () => {
-      expect(formatter.formatDiff(90.5).trim()).toBe('+1:30.500');
+      // Por encima del minuto el milisegundo se pierde a proposito: "+1:30.500"
+      // son 9 celdas en una columna de 7 y rompia la fila. 90,5 s redondea a 91
+      expect(formatter.formatDiff(90.5).trim()).toBe('+1:31');
+      expect(formatter.formatDiff(1941.8).trim()).toBe('+32:22');
+      expect(formatter.formatDiff(-1941).trim()).toBe('-32:21');
+      // El total se redondea entero, no cada parte: 119,7 s no puede dar "1:60"
+      expect(formatter.formatDiff(119.7).trim()).toBe('+2:00');
+      // Justo por debajo del minuto los milisegundos siguen ahi
+      expect(formatter.formatDiff(59.999).trim()).toBe('+59.999');
+    });
+
+    it('recorta en seco por encima de los 999 minutos antes que desbordar', () => {
+      // Dato imposible en una daily de quince minutos, pero la columna son 7
+      // celdas y no puede crecer por un valor roto
+      expect(formatter.formatDiff(60_000)).toHaveLength(7);
+      expect(formatter.visualWidth(formatter.formatDiff(60_000))).toBe(7);
     });
 
     it('should truncate long names', () => {
@@ -360,5 +376,309 @@ describe('DiscordFormatterService', () => {
         expect(embeds[i].description!).not.toContain(summaryText);
       }
     });
+  });
+
+  describe('formatLiveRaceEmbeds', () => {
+    // Es el mensaje que se reescribe en CADA entrada de piloto y no tenia ni un
+    // test, asi que espeja lo que ya se le exige al mensaje final.
+
+    const liveGrid = [
+      makeEntry(1, 'Alice', 25, 1.0),
+      makeEntry(2, 'Bob', 18, 3.0, false, true),
+    ];
+    const GREEN_LIGHT = new Date('2026-03-27T09:00:00Z');
+
+    it('se anuncia como en directo en el titulo, el color y el pie', () => {
+      const embeds = formatter.formatLiveRaceEmbeds(liveGrid, GREEN_LIGHT);
+      const last = embeds[embeds.length - 1];
+
+      expect(embeds[0].title).toContain('EN DIRECTO');
+      expect(embeds[0].color).toBe(0xe74c3c);
+      expect(last.footer?.text).toContain('EN DIRECTO');
+      expect(last.footer?.text).toContain('Secture');
+      expect(last.timestamp).toBeDefined();
+    });
+
+    it('no se confunde con el mensaje de resultados', () => {
+      const live = formatter.formatLiveRaceEmbeds(liveGrid, GREEN_LIGHT);
+      const final = formatter.formatRaceEmbeds(makeRace(liveGrid));
+
+      expect(final[0].title).not.toContain('EN DIRECTO');
+      expect(final[0].color).not.toBe(live[0].color);
+      expect(final[final.length - 1].footer?.text).not.toContain('EN DIRECTO');
+    });
+
+    it('concuerda el singular y el plural de piloto', () => {
+      const one = formatter.formatLiveRaceEmbeds(
+        [makeEntry(1, 'Solo', 25, 1.0)],
+        GREEN_LIGHT,
+      );
+      const two = formatter.formatLiveRaceEmbeds(liveGrid, GREEN_LIGHT);
+
+      expect(one[0].description!).toMatch(/\*\*1\*\*\s+piloto(?!s)/);
+      expect(two[0].description!).toMatch(/\*\*2\*\*\s+pilotos/);
+    });
+
+    it('concuerda el singular y el plural de salida en falso', () => {
+      const one = formatter.formatLiveRaceEmbeds(
+        [makeEntry(0, 'Early', -5, -15, true, true), makeEntry(1, 'OnTime', 25, 1)],
+        GREEN_LIGHT,
+      );
+      const two = formatter.formatLiveRaceEmbeds(
+        [
+          makeEntry(0, 'Early', -5, -15, true, true),
+          makeEntry(0, 'Earlier', -5, -30, true),
+          makeEntry(1, 'OnTime', 25, 1),
+        ],
+        GREEN_LIGHT,
+      );
+
+      expect(one[0].description!).toMatch(/\*\*1\*\*\s+salida en falso/);
+      expect(two[0].description!).toMatch(/\*\*2\*\*\s+salidas en falso/);
+    });
+
+    it('no menciona salidas en falso cuando no hay ninguna', () => {
+      const embeds = formatter.formatLiveRaceEmbeds(liveGrid, GREEN_LIGHT);
+
+      expect(embeds[0].description!).not.toContain('en falso');
+    });
+
+    it('pone el marcador del semaforo dentro del bloque de codigo', () => {
+      const embeds = formatter.formatLiveRaceEmbeds(liveGrid, GREEN_LIGHT);
+      const body = embeds[0].description!.split('```')[1];
+
+      expect(body).toContain('\u{1F6A5}');
+      expect(body).toContain('Alice');
+      expect(body).toContain('Bob');
+      // El marcador lleva la hora del semaforo, no la del piloto
+      expect(body).toMatch(/\d{2}:\d{2}:\d{2}/);
+    });
+
+    it('anade el chip de busted cuando ya hay un ultimo de la clase', () => {
+      const embeds = formatter.formatLiveRaceEmbeds(liveGrid, GREEN_LIGHT);
+      const last = embeds[embeds.length - 1];
+
+      expect(last.fields).toHaveLength(1);
+      expect(last.fields![0].value).toContain('Busted');
+      expect(last.fields![0].value).toContain('Bob');
+      expect(last.fields![0].value).toContain('+3.000');
+    });
+
+    it('se queda sin estadisticas mientras no haya busted', () => {
+      const embeds = formatter.formatLiveRaceEmbeds(
+        [makeEntry(1, 'Alice', 25, 1.0), makeEntry(2, 'Bob', 18, 3.0)],
+        GREEN_LIGHT,
+      );
+      const last = embeds[embeds.length - 1];
+
+      expect(last.fields).toBeUndefined();
+      expect(last.footer?.text).toContain('EN DIRECTO');
+    });
+
+    it('trocea la parrilla en varios embeds con muchisimos pilotos', () => {
+      const many = Array.from({ length: 200 }, (_, i) =>
+        makeEntry(i + 1, `Very Long Driver Name ${i}`, i < 10 ? 25 : 1, i + 0.5),
+      );
+      many[many.length - 1] = makeEntry(200, 'LastDriver', 1, 199.5, false, true);
+
+      const embeds = formatter.formatLiveRaceEmbeds(many, GREEN_LIGHT);
+
+      expect(embeds.length).toBeGreaterThan(1);
+      // El resumen solo en el primero y el pie solo en el ultimo
+      expect(embeds[0].description!).toContain('**200** pilotos');
+      expect(embeds[0].title).toContain('EN DIRECTO');
+      for (let i = 1; i < embeds.length; i++) {
+        expect(embeds[i].description!).not.toContain('**200** pilotos');
+        expect(embeds[i].title).toBeUndefined();
+      }
+      const withFooter = embeds.filter((e) => e.footer != null);
+      expect(withFooter).toHaveLength(1);
+      expect(embeds[embeds.length - 1].fields).toHaveLength(1);
+      embeds.forEach((embed) =>
+        expect(embed.description!.length).toBeLessThanOrEqual(4096),
+      );
+    });
+  });
+
+  describe('ancho de las filas', () => {
+    // Presupuesto duro: 33 celdas. Discord parte la linea en cuanto se pasa, y
+    // una fila partida descuadra la tabla entera del embed.
+    const BUDGET = 33;
+    const DIFFS = [0.5, 60, 600, 1941, 1941.8, -0.5, -60, -1941];
+
+    it('ninguna fila de la parrilla pasa de las 33 celdas', () => {
+      for (const diff of DIFFS) {
+        const rows = [
+          formatter.formatGridRow(makeEntry(1, 'Alice', 25, diff), 20),
+          formatter.formatGridRow(makeEntry(2, 'Bob', 18, diff), 20),
+          formatter.formatGridRow(makeEntry(3, 'Carla', 15, diff), 20),
+          formatter.formatGridRow(
+            makeEntry(4, 'Enrique Caballero Domínguez', 12, diff),
+            20,
+          ),
+          formatter.formatGridRow(makeEntry(19, 'Rezagado', 1, diff), 20),
+          formatter.formatGridRow(
+            makeEntry(20, 'Ultimo', 1, diff, false, true),
+            20,
+          ),
+          formatter.formatGridRow(makeEntry(0, 'Early', -5, diff, true), 20),
+          formatter.formatGridRow(
+            makeEntry(0, 'Earliest', -5, diff, true, true),
+            20,
+          ),
+        ];
+        for (const row of rows) {
+          expect(formatter.visualWidth(row)).toBe(BUDGET);
+        }
+      }
+    });
+
+    it('la cabecera y el marcador del semaforo miden lo mismo que las filas', () => {
+      const race = makeRace([
+        makeEntry(1, 'Alice', 25, 0.5),
+        makeEntry(2, 'Bob', 18, 1941, false, true),
+      ]);
+      const body = formatter.formatRaceEmbeds(race)[0].description!.split('```')[1];
+
+      for (const line of body.split('\n')) {
+        if (line.trim() === '') continue;
+        expect(formatter.visualWidth(line)).toBeLessThanOrEqual(BUDGET);
+      }
+    });
+
+    it('cuenta el emoji como dos celdas al recortar el nombre', () => {
+      // Un emoji ocupa dos celdas y contar caracteres desbordaba la columna: un
+      // nombre con una familia unida por ZWJ llegaba a 34 celdas
+      const hostile = '\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{200D}\u{1F466} Familia Muy Larga';
+      const row = formatter.formatGridRow(makeEntry(7, hostile, 1, 1941), 20);
+
+      expect(formatter.visualWidth(row)).toBe(BUDGET);
+    });
+
+    it('no parte un par surrogate al recortar', () => {
+      // Un surrogate huerfano hace que Discord conteste 400
+      const emojis = '\u{1F3CE}\u{1F3CE}\u{1F3CE}\u{1F3CE}\u{1F3CE}\u{1F3CE}\u{1F3CE}\u{1F3CE}';
+      const truncated = formatter.truncate(emojis, 13);
+
+      expect(formatter.visualWidth(truncated)).toBe(13);
+      expect(truncated).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+      expect(truncated).not.toMatch(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+    });
+
+    it('ninguna fila del campeonato pasa de las 33 celdas', () => {
+      const standings = [
+        new ChampionshipStanding(
+          new Driver('d1', 'g1', 'Enrique Caballero Domínguez', null),
+          1223, 89, 0, 1, 1, 21, 43,
+        ),
+        new ChampionshipStanding(
+          new Driver('d2', 'g2', '\u{1F3CE}\u{FE0F} Bob', null),
+          -5, 1, 0, 65, 65, 0, 0,
+        ),
+      ];
+      const body = formatter
+        .formatChampionshipEmbeds(standings, 89)[0]
+        .description!.split('```')[1];
+
+      for (const line of body.split('\n')) {
+        if (line.trim() === '') continue;
+        expect(formatter.visualWidth(line)).toBeLessThanOrEqual(BUDGET);
+      }
+    });
+  });
+
+  describe('nombres hostiles', () => {
+    it('un displayName con backticks no puede cerrar el bloque de codigo', () => {
+      const race = makeRace([
+        makeEntry(1, '```', 25, 1.0),
+        makeEntry(2, '``` \nrm -rf', 18, 2.0, false, true),
+      ]);
+
+      const desc = formatter.formatRaceEmbeds(race)[0].description!;
+      const fences = desc.split('```').length - 1;
+
+      // Exactamente los dos del bloque, el de apertura y el de cierre
+      expect(fences).toBe(2);
+      const body = desc.split('```')[1];
+      expect(body).not.toContain('`');
+    });
+
+    it('tampoco lo cierra en la tabla del campeonato', () => {
+      const standings = [
+        new ChampionshipStanding(
+          new Driver('d1', 'g1', '``` fuera', null),
+          100, 1, 0, 1, 1, 0, 0,
+        ),
+      ];
+
+      const desc = formatter.formatChampionshipEmbeds(standings, 1)[0].description!;
+
+      expect(desc.split('```').length - 1).toBe(2);
+      expect(desc.split('```')[1]).not.toContain('`');
+    });
+
+    it('sustituye el nombre que el saneado se come entero', () => {
+      expect(formatter.sanitizeName('```')).toBe('?');
+      expect(formatter.sanitizeName('')).toBe('?');
+      expect(formatter.sanitizeName(null)).toBe('?');
+    });
+
+    it('no pega dos palabras al quitar un salto de linea', () => {
+      expect(formatter.sanitizeName('Ana\nMaria')).toBe('Ana Maria');
+      expect(formatter.sanitizeName('Ana\tMaria')).toBe('Ana Maria');
+      expect(formatter.sanitizeName('  Ana   Maria  ')).toBe('Ana Maria');
+    });
+
+    it('quita el override bidi que daria la vuelta a la fila', () => {
+      expect(formatter.sanitizeName('Ana\u202EairaM')).toBe('AnaairaM');
+    });
+
+    it('conserva el ZWJ que compone un emoji', () => {
+      const family = '\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}';
+
+      expect(formatter.sanitizeName(family)).toBe(family);
+    });
+
+    it('escapa el markdown del chip de busted, que va fuera del bloque', () => {
+      const race = makeRace([
+        makeEntry(1, 'Alice', 25, 1.0),
+        makeEntry(2, '**Bob** _el_ [malo](x)', 18, 2.0, false, true),
+      ]);
+
+      const stats = formatter.formatRaceEmbeds(race).at(-1)!.fields![0].value;
+
+      // El nombre del piloto no puede poner en negrita el resto del chip
+      expect(stats).toContain('\\*\\*Bob\\*\\*');
+      expect(stats).toContain('\\_el\\_');
+      expect(stats).toContain('\\[malo\\]\\(x\\)');
+    });
+  });
+});
+
+describe('coherencia entre la tabla y la grafica', () => {
+  // La tabla del embed y la grafica adjunta viajan en el MISMO mensaje de
+  // Discord, asi que el mismo piloto no puede salir con dos cifras distintas.
+  // Paso: la tabla se recorto a mm:ss para no romper la linea en clientes
+  // estrechos y la grafica se quedo en milisegundos, con lo que 65,6 s daba
+  // "+1:06" arriba y "+1:05.600" abajo, que ni se leen como el mismo minuto.
+  const formatter = new DiscordFormatterService();
+
+  it('dan la misma cifra por encima del minuto', () => {
+    for (const segundos of [60, 65.4, 65.6, 90.5, 119.7, 900, 1069.2, 1830, 1941.8]) {
+      const tabla = formatter.formatDiff(segundos).trim();
+      const grafica = formatDiffGrafica(segundos);
+
+      expect(grafica).toBe(tabla);
+    }
+  });
+
+  it('por debajo del minuto la grafica anade la unidad y conserva el milisegundo', () => {
+    for (const segundos of [0.072, 12.5, 59.999]) {
+      const tabla = formatter.formatDiff(segundos).trim();
+      const grafica = formatDiffGrafica(segundos);
+
+      // La grafica tiene sitio para la "s", la columna de la tabla no
+      expect(grafica).toBe(`${tabla}s`);
+    }
   });
 });
