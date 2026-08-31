@@ -173,37 +173,93 @@ export class DiscordFormatterService {
    * empatados, por lo mismo que la calavera es compartida.
    */
   formatSeasonChangeEmbed(summary: SeasonSummary): DiscordEmbed {
-    const racesLabel = summary.racesCount === 1 ? 'carrera' : 'carreras';
+    const racesLabel = summary.racesCount === 1 ? 'daily' : 'dailies';
     const driversLabel = summary.driversCount === 1 ? 'piloto' : 'pilotos';
 
-    const lines = summary.podium.map((s) => {
-      const medal = this.championshipPosLabel(s.rank).trim();
-      const name = this.escapeMarkdown(
+    // Una linea por POSICION del podio y no por piloto, igual que el panel del
+    // podio de la grafica: si algun dia el campeonato comparte posicion como la
+    // hace la parrilla, la linea nombra al grupo en vez de dejar a uno fuera
+    const byRank = new Map<number, ChampionshipStanding[]>();
+    for (const s of summary.podium) {
+      byRank.set(s.rank, [...(byRank.get(s.rank) ?? []), s]);
+    }
+
+    const lines = [...byRank.entries()]
+      .sort(([a], [b]) => a - b)
+      .flatMap(([rank, tied]) => {
+        const medal = this.medalFor(rank);
+        const names = this.joinNames(tied);
+        const stats = this.seasonStats(tied[0]);
+        return [
+          `${medal}  **${names}** ${this.podiumPhrase(rank, tied.length)}`,
+          `-# ${stats}`,
+        ];
+      });
+
+    return {
+      title: `\u{1F3C1}  SE ACABA LA TEMPORADA ${summary.label}`,
+      color: 0xffd700,
+      description:
+        `**${summary.racesCount}** ${racesLabel}  \u{B7}  **${summary.driversCount}** ${driversLabel}\n\n` +
+        `Este es el podio final:\n\n` +
+        `${lines.join('\n')}\n\n` +
+        `\u{1F6A6}  **Y ahora lo bueno: arranca la ${summary.nextLabel}.**\n` +
+        `El campeón y el último de la tabla vuelven a salir desde la misma casilla.`,
+      footer: { text: 'Daily Race \u{2014} Secture' },
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Solo el metal, sin el numero de posicion: aqui la medalla ya dice el cajon y
+   * el numero delante era ruido. En la tabla del campeonato si va el numero,
+   * porque ahi es la columna Pos y llega hasta la posicion ochenta y tantos.
+   */
+  private medalFor(rank: number): string {
+    if (rank === 1) return '\u{1F3C6}';
+    if (rank === 2) return '\u{1F948}';
+    if (rank === 3) return '\u{1F949}';
+    return '\u{1F3CE}\u{FE0F}';
+  }
+
+  /**
+   * Lo que se dice de cada cajon. El tercero cierra el podio, el segundo lo
+   * aguanta y el primero se lo lleva: tres frases distintas para que la lista no
+   * suene a volcado de la tabla, que ya va justo debajo en el mismo canal.
+   */
+  private podiumPhrase(rank: number, tied: number): string {
+    const plural = tied > 1;
+    if (rank === 1) return plural ? 'comparten el título' : 'se lleva el título';
+    if (rank === 2) {
+      return plural
+        ? 'aguantan el segundo cajón'
+        : 'aguanta el segundo cajón';
+    }
+    if (rank === 3) return plural ? 'cierran el podio' : 'cierra el podio';
+    return plural ? 'también suben' : 'también sube';
+  }
+
+  /** Puntos y victorias del cajon. Sin victorias no se menciona el cero */
+  private seasonStats(standing: ChampionshipStanding): string {
+    const pts = `${standing.totalPoints} pts`;
+    if (standing.wins === 0) return pts;
+    const winsLabel = standing.wins === 1 ? 'victoria' : 'victorias';
+    return `${pts}  \u{B7}  ${standing.wins} ${winsLabel}`;
+  }
+
+  /** Nombres de un cajon compartido, saneados y con el markdown escapado */
+  private joinNames(tied: ChampionshipStanding[]): string {
+    const names = tied.map((s) =>
+      this.escapeMarkdown(
         this.truncate(
           this.sanitizeName(s.driver.displayName),
           BUSTED_NAME_MAX,
         ).trimEnd(),
-      );
-      const wins = s.wins === 1 ? 'victoria' : 'victorias';
-      return `${medal}  **${name}**  \u{B7}  ${s.totalPoints} pts  \u{B7}  ${s.wins} ${wins}`;
-    });
-
-    const cierre =
-      `\u{1F3C1}  **${summary.racesCount}** ${racesLabel}  \u{B7}  ` +
-      `\u{1F3CE}\u{FE0F}  **${summary.driversCount}** ${driversLabel}`;
-
-    return {
-      title: `\u{1F3C6}  SE CIERRA LA TEMPORADA ${summary.label}`,
-      color: 0xffd700,
-      description:
-        `${cierre}\n\n` +
-        `${lines.join('\n')}\n\n` +
-        `\u{1F6A6}  **Arranca la temporada ${summary.nextLabel}.** ` +
-        `Todos vuelven a cero, el cronometro manda otra vez.\n` +
-        `-# Los resultados anteriores quedan guardados, pero ya no puntuan`,
-      footer: { text: 'Daily Race \u{2014} Secture' },
-      timestamp: new Date().toISOString(),
-    };
+      ),
+    );
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return `${names[0]} y ${names[1]}`;
+    return `${names[0]} y ${names.length - 1} más`;
   }
 
   // ── Live Race ──────────────────────────────────────────────
