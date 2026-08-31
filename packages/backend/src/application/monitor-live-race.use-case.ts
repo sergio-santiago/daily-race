@@ -26,10 +26,10 @@ import {
 import { Race, RaceStatus } from '../core/entities/race.entity';
 import { StartingGridEntry } from '../core/entities/starting-grid-entry.entity';
 import { BuildStartingGridUseCase } from './build-starting-grid.use-case';
-import { GetChampionshipStandingsUseCase } from './get-championship-standings.use-case';
+import { PublishChampionshipUseCase } from './publish-championship.use-case';
 import { FindConferenceRecordService } from './find-conference-record.service';
 import { ConfigService } from '@nestjs/config';
-import { DAILY_MEETING_CODE, SEASON_START, ALL_TIME_END } from '../core/constants';
+import { DAILY_MEETING_CODE } from '../core/constants';
 
 // Tope de ticks que se dedican a cerrar una carrera. Persistir es idempotente
 // (se recupera la carrera ya guardada), asi que solo limita los reintentos de
@@ -69,7 +69,7 @@ export class MonitorLiveRaceUseCase {
     @Inject(NOTIFICATION_PORT)
     private readonly notification: NotificationPort,
     private readonly buildStartingGrid: BuildStartingGridUseCase,
-    private readonly getChampionship: GetChampionshipStandingsUseCase,
+    private readonly publishChampionship: PublishChampionshipUseCase,
     private readonly findConferenceRecord: FindConferenceRecordService,
     config: ConfigService,
   ) {
@@ -386,12 +386,7 @@ export class MonitorLiveRaceUseCase {
 
   private async sendChampionship(race: Race): Promise<boolean> {
     try {
-      const standings = await this.getChampionship.execute();
-      const allRaces = await this.raceRepository.findByDateRange(
-        SEASON_START,
-        ALL_TIME_END,
-      );
-      await this.notification.publishChampionshipStandings(standings, allRaces);
+      await this.publishChampionship.execute();
       return true;
     } catch (error) {
       this.logger.error(

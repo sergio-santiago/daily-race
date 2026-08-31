@@ -4,6 +4,7 @@ import { NotificationPort } from '../../core/ports/notification.port';
 import { Race } from '../../core/entities/race.entity';
 import { StartingGridEntry } from '../../core/entities/starting-grid-entry.entity';
 import { ChampionshipStanding } from '../../core/entities/championship-standing.entity';
+import { SeasonSummary } from '../../core/entities/season-summary.entity';
 import { DiscordFormatterService, DiscordEmbed } from './discord-formatter.service';
 import { ChampionshipEvolutionChartService } from '../charts/championship-evolution-chart.service';
 import { RaceGapChartService } from '../charts/race-gap-chart.service';
@@ -81,6 +82,19 @@ export class DiscordWebhookAdapter implements NotificationPort {
       );
       if (!isLast) await this.sleep(EMBED_SEND_DELAY_MS);
     }
+  }
+
+  /**
+   * Va al canal del campeonato y sin grafica: el relevo de temporada se lee de
+   * un vistazo, y la imagen que viene detras es la de la temporada nueva.
+   */
+  async publishSeasonChange(summary: SeasonSummary): Promise<void> {
+    const embed = this.formatter.formatSeasonChangeEmbed(summary);
+    await this.sendWebhook(
+      { username: 'Daily Race', embeds: [embed] },
+      this.championshipWebhook,
+    );
+    await this.sleep(EMBED_SEND_DELAY_MS);
   }
 
   async createLiveRaceMessage(

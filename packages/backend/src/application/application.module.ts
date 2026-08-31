@@ -8,6 +8,7 @@ import { ProcessRaceUseCase } from './process-race.use-case';
 import { GetChampionshipStandingsUseCase } from './get-championship-standings.use-case';
 import { FindConferenceRecordService } from './find-conference-record.service';
 import { MonitorLiveRaceUseCase } from './monitor-live-race.use-case';
+import { PublishChampionshipUseCase } from './publish-championship.use-case';
 
 @Module({
   imports: [PersistenceModule, GoogleModule, DiscordModule],
@@ -16,6 +17,7 @@ import { MonitorLiveRaceUseCase } from './monitor-live-race.use-case';
     BuildStartingGridUseCase,
     ProcessRaceUseCase,
     GetChampionshipStandingsUseCase,
+    PublishChampionshipUseCase,
     FindConferenceRecordService,
     MonitorLiveRaceUseCase,
   ],

@@ -8,7 +8,7 @@ import {
   StartingGridRepositoryPort,
 } from '../core/ports/starting-grid.repository.port';
 import { ChampionshipStanding } from '../core/entities/championship-standing.entity';
-import { SEASON_START, ALL_TIME_END } from '../core/constants';
+import { seasonStart, ALL_TIME_END } from '../core/constants';
 
 @Injectable()
 export class GetChampionshipStandingsUseCase {
@@ -19,7 +19,16 @@ export class GetChampionshipStandingsUseCase {
     private readonly startingGridRepository: StartingGridRepositoryPort,
   ) {}
 
-  async execute(): Promise<ChampionshipStanding[]> {
+  /**
+   * Sin argumentos devuelve la clasificacion de la temporada en curso, que es
+   * lo que se publica cada dia. El rango se pasa a mano para cerrar una
+   * temporada terminada, que es lo que necesita el mensaje de cambio de
+   * temporada: mismo ranking y mismos desempates, otra ventana de fechas.
+   */
+  async execute(
+    from: Date = seasonStart(),
+    to: Date = ALL_TIME_END,
+  ): Promise<ChampionshipStanding[]> {
     const drivers = await this.driverRepository.findAll();
     const standings: ChampionshipStanding[] = [];
 
@@ -27,8 +36,8 @@ export class GetChampionshipStandingsUseCase {
       const entries =
         await this.startingGridRepository.findByDriverInDateRange(
           driver.id,
-          SEASON_START,
-          ALL_TIME_END,
+          from,
+          to,
         );
       if (entries.length === 0) continue;
 
