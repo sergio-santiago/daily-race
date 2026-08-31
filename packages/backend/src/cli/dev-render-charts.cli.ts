@@ -56,7 +56,7 @@ async function run() {
     // escribe PNG a disco, no publica nada, y es la unica forma de ver la
     // grafica con una temporada larga detras. Los cortes de abajo recalculan la
     // clasificacion sobre el subconjunto, asi que cada escenario es coherente
-    // consigo mismo aunque el campeonato real cuente desde SEASON_START.
+    // consigo mismo aunque el campeonato real cuente solo la temporada en curso.
     const races = await raceRepository.findByDateRange(
       ALL_TIME_START,
       ALL_TIME_END,

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Race } from '../../core/entities/race.entity';
 import { StartingGridEntry } from '../../core/entities/starting-grid-entry.entity';
 import { ChampionshipStanding } from '../../core/entities/championship-standing.entity';
+import { SeasonSummary } from '../../core/entities/season-summary.entity';
 import { DEFAULT_TIMEZONE } from '../../core/constants';
 
 const SEP = '\u2500';
@@ -157,6 +158,52 @@ export class DiscordFormatterService {
       }
       return embed;
     });
+  }
+
+  // ── Cambio de temporada ────────────────────────────────────
+
+  /**
+   * El relevo entre temporadas. Sale una vez al ano, justo antes de la primera
+   * clasificacion de la temporada nueva, para que nadie se encuentre la tabla a
+   * cero sin explicacion.
+   *
+   * Nombra a los tres del podio y no solo al campeon: el segundo y el tercero
+   * tambien se han pasado un curso entero madrugando, y la foto de un podio se
+   * lee mejor que un solo nombre. Si una posicion esta empatada salen todos los
+   * empatados, por lo mismo que la calavera es compartida.
+   */
+  formatSeasonChangeEmbed(summary: SeasonSummary): DiscordEmbed {
+    const racesLabel = summary.racesCount === 1 ? 'carrera' : 'carreras';
+    const driversLabel = summary.driversCount === 1 ? 'piloto' : 'pilotos';
+
+    const lines = summary.podium.map((s) => {
+      const medal = this.championshipPosLabel(s.rank).trim();
+      const name = this.escapeMarkdown(
+        this.truncate(
+          this.sanitizeName(s.driver.displayName),
+          BUSTED_NAME_MAX,
+        ).trimEnd(),
+      );
+      const wins = s.wins === 1 ? 'victoria' : 'victorias';
+      return `${medal}  **${name}**  \u{B7}  ${s.totalPoints} pts  \u{B7}  ${s.wins} ${wins}`;
+    });
+
+    const cierre =
+      `\u{1F3C1}  **${summary.racesCount}** ${racesLabel}  \u{B7}  ` +
+      `\u{1F3CE}\u{FE0F}  **${summary.driversCount}** ${driversLabel}`;
+
+    return {
+      title: `\u{1F3C6}  SE CIERRA LA TEMPORADA ${summary.label}`,
+      color: 0xffd700,
+      description:
+        `${cierre}\n\n` +
+        `${lines.join('\n')}\n\n` +
+        `\u{1F6A6}  **Arranca la temporada ${summary.nextLabel}.** ` +
+        `Todos vuelven a cero, el cronometro manda otra vez.\n` +
+        `-# Los resultados anteriores quedan guardados, pero ya no puntuan`,
+      footer: { text: 'Daily Race \u{2014} Secture' },
+      timestamp: new Date().toISOString(),
+    };
   }
 
   // ── Live Race ──────────────────────────────────────────────

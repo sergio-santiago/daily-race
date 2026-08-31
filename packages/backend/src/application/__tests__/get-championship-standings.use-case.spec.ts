@@ -10,7 +10,7 @@ import {
 } from '../../core/ports/starting-grid.repository.port';
 import { Driver } from '../../core/entities/driver.entity';
 import { StartingGridEntry } from '../../core/entities/starting-grid-entry.entity';
-import { SEASON_START } from '../../core/constants';
+import { seasonStart } from '../../core/constants';
 
 function makeEntry(
   position: number,
@@ -285,7 +285,7 @@ describe('GetChampionshipStandingsUseCase', () => {
       await useCase.execute();
 
       const [, start] = gridRepository.findByDriverInDateRange.mock.calls[0];
-      expect(start).toEqual(SEASON_START);
+      expect(start).toEqual(seasonStart());
     });
 
     it('deja fuera de la tabla a quien no ha corrido esta temporada', async () => {

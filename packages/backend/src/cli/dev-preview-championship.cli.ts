@@ -2,15 +2,12 @@ import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import { AppModule } from '../app.module';
 import { GetChampionshipStandingsUseCase } from '../application/get-championship-standings.use-case';
+import { PublishChampionshipUseCase } from '../application/publish-championship.use-case';
 import {
   RACE_REPOSITORY,
   RaceRepositoryPort,
 } from '../core/ports/race.repository.port';
-import {
-  NOTIFICATION_PORT,
-  NotificationPort,
-} from '../core/ports/notification.port';
-import { SEASON_START, ALL_TIME_END } from '../core/constants';
+import { ALL_TIME_END, seasonStart } from '../core/constants';
 
 async function run() {
   if (process.env.NODE_ENV === 'production') {
@@ -24,20 +21,21 @@ async function run() {
   });
 
   try {
+    // Se publica por el mismo caso de uso que produccion, para que el preview
+    // incluya el mensaje de cambio de temporada cuando toque
+    const publishChampionship = app.get(PublishChampionshipUseCase);
     const getChampionship = app.get(GetChampionshipStandingsUseCase);
     const raceRepository = app.get<RaceRepositoryPort>(RACE_REPOSITORY);
-    const notification = app.get<NotificationPort>(NOTIFICATION_PORT);
+
+    await publishChampionship.execute();
 
     const standings = await getChampionship.execute();
-    const allRaces = await raceRepository.findByDateRange(
-      SEASON_START,
+    const races = await raceRepository.findByDateRange(
+      seasonStart(),
       ALL_TIME_END,
     );
-
-    await notification.publishChampionshipStandings(standings, allRaces);
-
     logger.log(
-      `Published championship with ${standings.length} drivers across ${allRaces.length} races`,
+      `Published championship with ${standings.length} drivers across ${races.length} races`,
     );
   } finally {
     await app.close();

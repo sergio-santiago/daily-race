@@ -3,6 +3,7 @@ import { Race, RaceStatus } from '../../../core/entities/race.entity';
 import { Driver } from '../../../core/entities/driver.entity';
 import { StartingGridEntry } from '../../../core/entities/starting-grid-entry.entity';
 import { ChampionshipStanding } from '../../../core/entities/championship-standing.entity';
+import { SeasonSummary } from '../../../core/entities/season-summary.entity';
 import { formatDiff as formatDiffGrafica } from '../../charts/scale';
 
 function makeEntry(
@@ -739,4 +740,75 @@ describe('calavera compartida', () => {
 
     expect(texto).not.toContain('Busted');
   });
+
+  describe('formatSeasonChangeEmbed', () => {
+    const podio = (nombres: string[]): ChampionshipStanding[] =>
+      nombres.map(
+        (n, i) =>
+          new ChampionshipStanding(
+            new Driver(`d${i}`, `g${i}`, n, null),
+            1223 - i * 100,
+            82,
+            1,
+            1,
+            i + 1,
+            20 - i * 5,
+            30,
+          ),
+      );
+
+    const resumen = (nombres: string[]): SeasonSummary =>
+      new SeasonSummary('2026-2027', 89, 83, podio(nombres), '2027-2028');
+
+    it('nombra a los tres del podio, no solo al campeon', () => {
+      const embed = formatter.formatSeasonChangeEmbed(
+        resumen(['Ana', 'Bruno', 'Carla']),
+      );
+
+      expect(embed.description).toContain('Ana');
+      expect(embed.description).toContain('Bruno');
+      expect(embed.description).toContain('Carla');
+    });
+
+    it('dice que temporada se cierra y cual arranca', () => {
+      const embed = formatter.formatSeasonChangeEmbed(resumen(['Ana']));
+
+      expect(embed.title).toContain('2026-2027');
+      expect(embed.description).toContain('2027-2028');
+    });
+
+    it('resume la temporada que termina', () => {
+      const embed = formatter.formatSeasonChangeEmbed(resumen(['Ana']));
+
+      expect(embed.description).toContain('89');
+      expect(embed.description).toContain('carreras');
+      expect(embed.description).toContain('83');
+      expect(embed.description).toContain('pilotos');
+    });
+
+    it('no promete que los resultados viejos sigan puntuando', () => {
+      // El histórico se guarda pero no cuenta para nada que se publique, y el
+      // mensaje no debe dar a entender lo contrario
+      const embed = formatter.formatSeasonChangeEmbed(resumen(['Ana']));
+
+      expect(embed.description).toContain('ya no puntuan');
+    });
+
+    it('sanea el nombre para que no rompa el mensaje', () => {
+      const embed = formatter.formatSeasonChangeEmbed(
+        resumen(['**Ana**\n`x`']),
+      );
+
+      expect(embed.description).not.toContain('\n`x`');
+      expect(embed.description).toContain('\\*\\*Ana\\*\\*');
+    });
+
+    it('aguanta un podio de una sola persona', () => {
+      const embed = formatter.formatSeasonChangeEmbed(resumen(['Ana']));
+
+      expect(embed.description).toContain('Ana');
+      expect(embed.title).toBeDefined();
+    });
+  });
+
 });

@@ -3,10 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { ProcessRaceUseCase } from '../process-race.use-case';
 import { BuildStartingGridUseCase } from '../build-starting-grid.use-case';
 import { CalculatePointsUseCase } from '../calculate-points.use-case';
-import { GetChampionshipStandingsUseCase } from '../get-championship-standings.use-case';
+import { PublishChampionshipUseCase } from '../publish-championship.use-case';
 import { FindConferenceRecordService } from '../find-conference-record.service';
 import { Driver } from '../../core/entities/driver.entity';
-import { SEASON_START } from '../../core/constants';
 import {
   MEET_PROVIDER,
   MeetProviderPort,
@@ -81,6 +80,7 @@ describe('ProcessRaceUseCase', () => {
   let driverRepository: jest.Mocked<DriverRepositoryPort>;
   let gridRepository: jest.Mocked<StartingGridRepositoryPort>;
   let notification: jest.Mocked<NotificationPort>;
+  let publishChampionship: { execute: jest.Mock };
 
   beforeEach(async () => {
     meetProvider = {
@@ -113,10 +113,13 @@ describe('ProcessRaceUseCase', () => {
     notification = {
       publishRaceResults: jest.fn(),
       publishChampionshipStandings: jest.fn(),
+      publishSeasonChange: jest.fn(),
       createLiveRaceMessage: jest.fn(),
       editLiveRaceMessage: jest.fn(),
       editLiveRaceMessageAsFinal: jest.fn(),
     };
+
+    publishChampionship = { execute: jest.fn().mockResolvedValue(undefined) };
 
     module = await Test.createTestingModule({
       providers: [
@@ -124,8 +127,8 @@ describe('ProcessRaceUseCase', () => {
         BuildStartingGridUseCase,
         CalculatePointsUseCase,
         {
-          provide: GetChampionshipStandingsUseCase,
-          useValue: { execute: jest.fn().mockResolvedValue([]) },
+          provide: PublishChampionshipUseCase,
+          useValue: publishChampionship,
         },
         {
           provide: FindConferenceRecordService,
@@ -221,11 +224,10 @@ describe('ProcessRaceUseCase', () => {
     expect(notification.publishRaceResults).toHaveBeenCalledTimes(1);
   });
 
-  it('pide al repositorio solo las carreras de la temporada en curso', async () => {
-    // La grafica de evolucion se dibuja con estas carreras y la tabla con el
-    // standing. Si aqui se pide "all time" mientras el standing cuenta desde
-    // SEASON_START, el embed dice una carrera y la imagen dibuja la temporada
-    // pasada entera.
+  it('delega la publicacion del campeonato en el caso de uso comun', async () => {
+    // El rango de fechas y la decision de anunciar temporada nueva viven en
+    // PublishChampionshipUseCase, para que este camino y el del monitor en
+    // directo publiquen lo mismo sin repetir la logica
     calendarProvider.getDailyEvent.mockResolvedValue(mockCalendarEvent());
     meetProvider.getConferenceRecords.mockResolvedValue([
       mockConferenceRecord(),
@@ -251,16 +253,11 @@ describe('ProcessRaceUseCase', () => {
         ),
     );
     gridRepository.saveAll.mockResolvedValue(undefined);
-    raceRepository.findByDateRange.mockResolvedValue([]);
     notification.publishRaceResults.mockResolvedValue(undefined);
-    notification.publishChampionshipStandings.mockResolvedValue(undefined);
 
     await useCase.execute();
 
-    expect(raceRepository.findByDateRange).toHaveBeenCalledWith(
-      SEASON_START,
-      expect.any(Date),
-    );
+    expect(publishChampionship.execute).toHaveBeenCalledTimes(1);
   });
 
   it('should return null when no participants found', async () => {

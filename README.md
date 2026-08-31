@@ -83,13 +83,25 @@ No hay columna de carreras disputadas (GP), y no es un olvido: la fila del embed
 
 ### Temporadas
 
-El campeonato cuenta desde `SEASON_START` (en `src/core/constants/config.constants.ts`), no desde el principio de los tiempos. La temporada en curso arranca el **1 de septiembre de 2026**, medianoche de Madrid.
+**La temporada va del 1 de septiembre al 31 de agosto**, y el campeonato se reinicia solo al cruzar esa medianoche. No hay nada que tocar cada ano: `seasonStart()` (en `src/core/constants/config.constants.ts`) calcula a que temporada pertenece una fecha, y todo lo que se publica cuenta desde ahi.
 
-Reiniciar el campeonato es mover esa fecha y nada mas. Las carreras anteriores siguen en la base con sus puntos, sus posiciones y sus salidas en falso, pero dejan de sumar en la clasificacion, asi que no hay que borrar nada y el reinicio se puede deshacer. Los pilotos tampoco se tocan: conservan su `google_id` para no duplicarse cuando vuelvan, y quien no haya corrido en la temporada en curso no sale en la tabla hasta que corra.
+Reiniciar no borra nada. Las carreras anteriores siguen en la base con sus puntos, sus posiciones y sus salidas en falso, simplemente dejan de entrar en el rango que se consulta. Los pilotos tampoco se tocan: conservan su `google_id` para no duplicarse cuando vuelvan, y quien no haya corrido en la temporada en curso no sale en la tabla hasta que corra.
+
+Que el historico se guarde no significa que cuente. Despues del reinicio **no queda ninguna estadistica publicada que mire mas atras**: puntos, victorias, podios, mejor posicion y salidas en falso se recalculan solo con la temporada en curso. Los datos viejos sirven para deshacer un reinicio, para consultas a mano y para probar las graficas, nada mas.
+
+#### El relevo
+
+La primera carrera de cada temporada dispara un mensaje en **#championship**, justo antes de la primera clasificacion: cierra la temporada que termina con su podio de tres y anuncia la que empieza. Existe para que nadie se encuentre la tabla a cero sin explicacion.
+
+El disparo es `PublishChampionshipUseCase`, y la condicion es que la temporada en curso tenga exactamente una carrera. Es una condicion derivada de los datos, asi que no necesita tabla de estado y sobrevive a un redeploy. Lo unico que anade el caso de uso es un registro en memoria de las temporadas ya anunciadas, para que un reintento del campeonato (el monitor lo intenta hasta tres veces si Discord falla) no republique el relevo.
+
+No hay relevo si no hay nada que cerrar, o sea en la primerisima temporada.
+
+#### Notas
 
 Mientras la temporada no tiene ninguna carrera, el campeonato no publica nada: la clasificacion esta vacia, el formatter devuelve cero embeds y la grafica devuelve `null`. Desde la primera carrera ya dibuja.
 
-La primera temporada fue del 24 de abril al 26 de agosto de 2026, 89 carreras. Es la que describen las notas de diseno de este README cuando hablan de "la temporada medida".
+La primera temporada real fue del 24 de abril al 26 de agosto de 2026, 89 carreras. Por la regla le corresponde la etiqueta `2025-2026`, aunque el proyecto no existiese en septiembre de 2025. Es la que describen las notas de diseno de este README cuando hablan de "la temporada medida".
 
 El CLI de graficas (`make dev-render-charts`) si lee todo el historico a proposito, porque es la unica forma de ver como queda una grafica con una temporada larga detras. Recalcula la clasificacion sobre el subconjunto que dibuja, asi que cada escenario es coherente consigo mismo.
 
@@ -128,7 +140,7 @@ El codigo usa terminologia de carreras/F1:
 | Victoria (P1)        | wins              | P1 sin salida en falso          |
 | Peor entrada         | WorstOnGrid       | Busted                          |
 | Ranking acumulado    | Championship      | Clasificacion general           |
-| Temporada            | Season            | Ventana de carreras que puntuan |
+| Temporada            | Season            | Del 1 de septiembre al 31 de agosto |
 
 ## Prerrequisitos
 
@@ -191,7 +203,7 @@ El backend incluye un **scheduler (cron)** que monitoriza la daily **en tiempo r
 - **Al terminar la reunion** (la sala se vacia):
   1. Persiste los datos en PostgreSQL (drivers, race, starting grid)
   2. Edita el mensaje live al **formato final** (de "EN DIRECTO" a resultado definitivo)
-  3. Publica la clasificacion general actualizada en **#championship** (Discord)
+  3. Publica la clasificacion general actualizada en **#championship** (Discord), precedida del mensaje de relevo si es la primera carrera de la temporada
 - Solo monitoriza reuniones que empezaron cerca de la hora programada del evento (±30 minutos)
 - Si la daily ya fue procesada, no la reprocesa (idempotente)
 - Los tres pasos del cierre son independientes y se reintentan por separado en los siguientes ticks (hasta 3 intentos). Un fallo puntual de Discord al cerrar la carrera dejaba antes el mensaje del dia congelado en "EN DIRECTO" y el campeonato sin publicar, sin manera de recuperarlo

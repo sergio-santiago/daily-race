@@ -4,11 +4,10 @@ import { ConfigService } from '@nestjs/config';
 import { MonitorLiveRaceUseCase } from '../monitor-live-race.use-case';
 import { BuildStartingGridUseCase } from '../build-starting-grid.use-case';
 import { CalculatePointsUseCase } from '../calculate-points.use-case';
-import { GetChampionshipStandingsUseCase } from '../get-championship-standings.use-case';
+import { PublishChampionshipUseCase } from '../publish-championship.use-case';
 import { FindConferenceRecordService } from '../find-conference-record.service';
 import { Driver } from '../../core/entities/driver.entity';
 import { Race } from '../../core/entities/race.entity';
-import { SEASON_START } from '../../core/constants';
 import {
   MEET_PROVIDER,
   MeetProviderPort,
@@ -64,6 +63,7 @@ describe('MonitorLiveRaceUseCase', () => {
   let driverRepository: jest.Mocked<DriverRepositoryPort>;
   let gridRepository: jest.Mocked<StartingGridRepositoryPort>;
   let notification: jest.Mocked<NotificationPort>;
+  let publishChampionship: { execute: jest.Mock };
   let findConferenceRecord: jest.Mocked<
     Pick<FindConferenceRecordService, 'findActiveForEvent' | 'findForEvent' | 'findByName'>
   >;
@@ -97,6 +97,7 @@ describe('MonitorLiveRaceUseCase', () => {
     notification = {
       publishRaceResults: jest.fn(),
       publishChampionshipStandings: jest.fn(),
+      publishSeasonChange: jest.fn(),
       createLiveRaceMessage: jest.fn().mockResolvedValue('msg-123'),
       editLiveRaceMessage: jest.fn(),
       editLiveRaceMessageAsFinal: jest.fn(),
@@ -107,14 +108,16 @@ describe('MonitorLiveRaceUseCase', () => {
       findByName: jest.fn(),
     };
 
+    publishChampionship = { execute: jest.fn().mockResolvedValue(undefined) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MonitorLiveRaceUseCase,
         BuildStartingGridUseCase,
         CalculatePointsUseCase,
         {
-          provide: GetChampionshipStandingsUseCase,
-          useValue: { execute: jest.fn().mockResolvedValue([]) },
+          provide: PublishChampionshipUseCase,
+          useValue: publishChampionship,
         },
         {
           provide: FindConferenceRecordService,
@@ -344,13 +347,7 @@ describe('MonitorLiveRaceUseCase', () => {
       expect(raceRepository.save).toHaveBeenCalledTimes(1);
       expect(gridRepository.saveAll).toHaveBeenCalledTimes(1);
       expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
-      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(1);
-      // Este es el camino que corre cada dia: las carreras que alimentan la
-      // grafica se piden desde el arranque de temporada, igual que el standing
-      expect(raceRepository.findByDateRange).toHaveBeenCalledWith(
-        SEASON_START,
-        expect.any(Date),
-      );
+      expect(publishChampionship.execute).toHaveBeenCalledTimes(1);
     });
 
     it('should clear state after finalization', async () => {
@@ -526,7 +523,7 @@ describe('MonitorLiveRaceUseCase', () => {
       expect(raceRepository.save).not.toHaveBeenCalled();
       expect(gridRepository.saveAll).not.toHaveBeenCalled();
       expect(notification.editLiveRaceMessageAsFinal).not.toHaveBeenCalled();
-      expect(notification.publishChampionshipStandings).not.toHaveBeenCalled();
+      expect(publishChampionship.execute).not.toHaveBeenCalled();
       expect(errorSpy).toHaveBeenCalled();
 
       // Y el dia no se pierde: en cuanto Meet responde, se cierra
@@ -549,7 +546,7 @@ describe('MonitorLiveRaceUseCase', () => {
       expect(raceRepository.save).toHaveBeenCalledTimes(1);
       expect(gridRepository.saveAll).toHaveBeenCalledTimes(1);
       expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
-      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(1);
+      expect(publishChampionship.execute).toHaveBeenCalledTimes(1);
       expect(errorSpy).not.toHaveBeenCalled();
 
       jest.clearAllMocks();
@@ -570,7 +567,7 @@ describe('MonitorLiveRaceUseCase', () => {
       expect(raceRepository.save).toHaveBeenCalledTimes(1);
       expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
       // Un fallo del mensaje final no impide publicar el campeonato
-      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(1);
+      expect(publishChampionship.execute).toHaveBeenCalledTimes(1);
 
       await useCase.execute();
 
@@ -579,7 +576,7 @@ describe('MonitorLiveRaceUseCase', () => {
       expect(gridRepository.saveAll).toHaveBeenCalledTimes(1);
       expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(2);
       // El campeonato ya salio, no se repite
-      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(1);
+      expect(publishChampionship.execute).toHaveBeenCalledTimes(1);
 
       const [messageId, race] =
         notification.editLiveRaceMessageAsFinal.mock.calls[1];
@@ -595,20 +592,20 @@ describe('MonitorLiveRaceUseCase', () => {
     });
 
     it('should retry the championship on the next tick when it fails once', async () => {
-      notification.publishChampionshipStandings.mockRejectedValueOnce(
+      publishChampionship.execute.mockRejectedValueOnce(
         new Error('500 internal error'),
       );
 
       await useCase.execute();
 
       expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
-      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(1);
+      expect(publishChampionship.execute).toHaveBeenCalledTimes(1);
 
       await useCase.execute();
 
       // El mensaje final ya estaba bien, no se vuelve a editar
       expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
-      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(2);
+      expect(publishChampionship.execute).toHaveBeenCalledTimes(2);
       expect(raceRepository.save).toHaveBeenCalledTimes(1);
 
       jest.clearAllMocks();
@@ -627,13 +624,13 @@ describe('MonitorLiveRaceUseCase', () => {
 
       expect(raceRepository.save).not.toHaveBeenCalled();
       expect(notification.editLiveRaceMessageAsFinal).not.toHaveBeenCalled();
-      expect(notification.publishChampionshipStandings).not.toHaveBeenCalled();
+      expect(publishChampionship.execute).not.toHaveBeenCalled();
 
       await useCase.execute();
 
       expect(raceRepository.save).toHaveBeenCalledTimes(1);
       expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
-      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(1);
+      expect(publishChampionship.execute).toHaveBeenCalledTimes(1);
     });
 
     it('should retry pending notifications even if the conference record disappears', async () => {
@@ -654,7 +651,7 @@ describe('MonitorLiveRaceUseCase', () => {
       const errorSpy = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation(() => undefined);
-      notification.publishChampionshipStandings.mockRejectedValue(
+      publishChampionship.execute.mockRejectedValue(
         new Error('500 internal error'),
       );
 
@@ -662,7 +659,7 @@ describe('MonitorLiveRaceUseCase', () => {
       await useCase.execute();
       await useCase.execute();
 
-      expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(3);
+      expect(publishChampionship.execute).toHaveBeenCalledTimes(3);
       expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
 
       const logged = errorSpy.mock.calls.map((call) => String(call[0]));
@@ -678,7 +675,7 @@ describe('MonitorLiveRaceUseCase', () => {
       await useCase.execute();
 
       expect(findConferenceRecord.findByName).not.toHaveBeenCalled();
-      expect(notification.publishChampionshipStandings).not.toHaveBeenCalled();
+      expect(publishChampionship.execute).not.toHaveBeenCalled();
       errorSpy.mockRestore();
     });
   });
