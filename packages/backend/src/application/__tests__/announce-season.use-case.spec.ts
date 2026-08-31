@@ -180,6 +180,43 @@ describe('AnnounceSeasonUseCase', () => {
     expect(notification.publishSeasonChange).not.toHaveBeenCalled();
   });
 
+  it('deja de recalcular la temporada en cuanto sabe que ya esta resuelta', async () => {
+    // Sin esto, cada tick reconstruye la temporada anterior completa solo para
+    // descubrir que ya se anuncio, 2880 veces al dia durante todo el ano
+    await useCase.execute(PRIMER_DIA);
+    const consultasTrasElPrimerTick = raceRepository.findByDateRange.mock.calls.length;
+
+    for (let i = 0; i < 50; i++) await useCase.execute(PRIMER_DIA);
+
+    expect(raceRepository.findByDateRange.mock.calls.length).toBe(
+      consultasTrasElPrimerTick,
+    );
+    expect(notification.publishSeasonChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('tambien corta el trabajo cuando el anuncio se lo llevo otro proceso', async () => {
+    announcements.claim.mockResolvedValue(false);
+
+    await useCase.execute(PRIMER_DIA);
+    const consultas = raceRepository.findByDateRange.mock.calls.length;
+    for (let i = 0; i < 20; i++) await useCase.execute(PRIMER_DIA);
+
+    expect(raceRepository.findByDateRange.mock.calls.length).toBe(consultas);
+    expect(notification.publishSeasonChange).not.toHaveBeenCalled();
+  });
+
+  it('vuelve a mirar cuando cambia la temporada', async () => {
+    // El atajo es por etiqueta, no un booleano: un proceso que siga vivo el
+    // septiembre siguiente tiene que anunciar la temporada nueva
+    await useCase.execute(PRIMER_DIA);
+    expect(notification.publishSeasonChange).toHaveBeenCalledTimes(1);
+
+    await useCase.execute(new Date(2028, 8, 1, 8, 0, 0));
+
+    expect(announcements.claim).toHaveBeenLastCalledWith('2028-2029');
+    expect(notification.publishSeasonChange).toHaveBeenCalledTimes(2);
+  });
+
   it('lleva las carreras del ano para poder dibujar su grafica', async () => {
     await useCase.execute(PRIMER_DIA);
 

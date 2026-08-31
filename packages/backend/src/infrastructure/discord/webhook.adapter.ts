@@ -100,16 +100,30 @@ export class DiscordWebhookAdapter implements NotificationPort {
     );
     this.attachChartToLastEmbed([embed], chart);
 
-    // Si un canal falla, el otro ya no se intenta y el anuncio queda a medias.
-    // Es aceptable: el registro ya esta puesto, asi que no habra reintento en
-    // bucle, y un relevo a medio publicar se remata a mano.
+    // Cada canal se intenta por separado a proposito. El relevo se publica una
+    // sola vez al ano y el registro ya esta puesto cuando llegamos aqui, asi que
+    // no hay reintento en bucle: si el primer canal se cayese arrastrando al
+    // segundo, el mensaje se perderia justo para la audiencia por la que se
+    // publica en los dos sitios, la de #race-day.
+    let publicados = 0;
     for (const webhook of [this.championshipWebhook, this.raceDayWebhook]) {
-      await this.sendWebhook(
-        { username: 'Daily Race', embeds: [embed] },
-        webhook,
-        chart,
-      );
+      try {
+        await this.sendWebhook(
+          { username: 'Daily Race', embeds: [embed] },
+          webhook,
+          chart,
+        );
+        publicados++;
+      } catch (error) {
+        this.logger.error(`Relevo de temporada fallido en un canal: ${error}`);
+      }
       await this.sleep(EMBED_SEND_DELAY_MS);
+    }
+
+    // Si no ha entrado en ninguno, que suba: quien llama lo registra y asi queda
+    // constancia de que hay que republicarlo a mano
+    if (publicados === 0) {
+      throw new Error('Relevo de temporada: ningun canal acepto el mensaje');
     }
   }
 

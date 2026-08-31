@@ -47,8 +47,21 @@ export class AnnounceSeasonUseCase {
     private readonly getChampionship: GetChampionshipStandingsUseCase,
   ) {}
 
+  /**
+   * Temporada ya resuelta en este proceso, anunciada por nosotros o por otro.
+   *
+   * No es la garantia de unicidad, esa es el unique de la tabla. Es un atajo
+   * para no pagar el calculo: sin el, cada tick reconstruiria la temporada
+   * anterior completa (un join de las carreras con sus parrillas mas una
+   * consulta por piloto) solo para descubrir que ya estaba anunciada, y eso son
+   * 2880 ticks al dia durante todo el ano siguiente al relevo.
+   */
+  private resolved: string | null = null;
+
   async execute(now: Date = new Date()): Promise<void> {
     const label = seasonLabel(now);
+    if (this.resolved === label) return;
+
     const summary = await this.buildPreviousSeason(now, label);
     if (!summary) return;
 
@@ -58,6 +71,9 @@ export class AnnounceSeasonUseCase {
     // caso es que el mensaje no salga y se publique a mano, que no molesta a
     // nadie.
     const isMine = await this.announcements.claim(label);
+    // Resuelta para este proceso en cuanto se sabe de quien es, tanto si el
+    // anuncio nos toca como si se lo llevo otro
+    this.resolved = label;
     if (!isMine) return;
 
     await this.notification.publishSeasonChange(summary);
