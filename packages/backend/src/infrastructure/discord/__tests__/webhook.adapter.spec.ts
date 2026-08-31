@@ -8,6 +8,7 @@ import { Race, RaceStatus } from '../../../core/entities/race.entity';
 import { Driver } from '../../../core/entities/driver.entity';
 import { StartingGridEntry } from '../../../core/entities/starting-grid-entry.entity';
 import { ChampionshipStanding } from '../../../core/entities/championship-standing.entity';
+import { SeasonSummary } from '../../../core/entities/season-summary.entity';
 
 // El pegamento de la feature: aqui se decide si la grafica viaja como adjunto,
 // si el mensaje sale igual cuando el render falla y si un 429 de Discord se
@@ -293,6 +294,59 @@ describe('DiscordWebhookAdapter', () => {
       expect(raceChart.renderPng).toHaveBeenCalledWith(grid, GREEN_LIGHT, {
         live: true,
       });
+    });
+  });
+
+  describe('relevo de temporada', () => {
+    const resumen = (): SeasonSummary =>
+      new SeasonSummary(
+        '2025-2026',
+        '2026-2027',
+        [],
+        [
+          new ChampionshipStanding(
+            new Driver('d1', 'g1', 'Ana', null),
+            1223,
+            82,
+            0,
+            1,
+            1,
+            23,
+            40,
+          ),
+        ],
+      );
+
+    it('publica en los dos canales, championship y race-day', async () => {
+      await adapter.publishSeasonChange(resumen());
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const urls = fetchMock.mock.calls.map((c) => c[0] as string);
+      expect(urls).toEqual([CHAMPIONSHIP, RACE_DAY]);
+    });
+
+    it('sigue con race-day aunque championship rechace el mensaje', async () => {
+      // El motivo de publicar en los dos sitios es la gente que solo sigue
+      // #race-day, que va segunda en el bucle: un fallo del primer canal no
+      // puede dejarles sin el unico mensaje que explica el reinicio
+      fetchMock
+        .mockResolvedValueOnce(fail(500))
+        .mockResolvedValueOnce(fail(500))
+        .mockResolvedValueOnce(fail(500))
+        .mockResolvedValue(ok());
+
+      await adapter.publishSeasonChange(resumen());
+
+      const urls = fetchMock.mock.calls.map((c) => c[0] as string);
+      expect(urls).toContain(RACE_DAY);
+    });
+
+    it('avisa a quien llama solo cuando no entra en ningun canal', async () => {
+      fetchMock.mockResolvedValue(fail(500));
+
+      await expect(adapter.publishSeasonChange(resumen())).rejects.toThrow(
+        /ningun canal/i,
+      );
     });
   });
 

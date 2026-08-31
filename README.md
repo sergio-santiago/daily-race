@@ -105,7 +105,19 @@ La idempotencia la da la tabla `season_announcements`, con un unique en la etiqu
 
 La tabla guarda solo el hecho de que la temporada se anuncio, nunca estadisticas. Las cifras se calculan de las carreras, que no se borran, y duplicarlas seria tener dos versiones de la verdad que se desincronizan en cuanto se corrija una carrera.
 
+Cada canal se publica por separado, con su propio `try/catch`: si el primero falla no puede arrastrar al segundo, que es precisamente el que justifica el doble envio. Solo si no entra en ninguno se avisa a quien llama.
+
 Un fallo del anuncio nunca tumba la daily: va en `try/catch` y el monitor sigue con el mensaje en directo. No hay relevo si no hay nada que cerrar, o sea en la primerisima temporada.
+
+**Si el relevo no sale**, la reserva ya esta puesta y ningun tick lo reintenta. Para forzarlo, borrar la marca y esperar el siguiente tick:
+
+```sql
+DELETE FROM season_announcements WHERE season_label = '2026-2027';
+```
+
+En cinco segundos se vuelve a intentar, siempre que sea un dia con daily programada y estemos dentro de la ventana del monitor (8:00 a 11:59, lunes a viernes). Fuera de esa ventana no se republica hasta el siguiente dia laborable.
+
+Una vez resuelta la temporada, el caso de uso corta en seco sin volver a consultar la base. Sin ese atajo, cada uno de los 2880 ticks diarios reconstruiria la temporada anterior completa durante todo el ano siguiente solo para descubrir que ya se anuncio.
 
 #### Notas
 
