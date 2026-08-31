@@ -29,7 +29,7 @@ import { BuildStartingGridUseCase } from './build-starting-grid.use-case';
 import { GetChampionshipStandingsUseCase } from './get-championship-standings.use-case';
 import { FindConferenceRecordService } from './find-conference-record.service';
 import { ConfigService } from '@nestjs/config';
-import { DAILY_MEETING_CODE, ALL_TIME_START, ALL_TIME_END } from '../core/constants';
+import { DAILY_MEETING_CODE, SEASON_START, ALL_TIME_END } from '../core/constants';
 
 @Injectable()
 export class ProcessRaceUseCase {
@@ -154,7 +154,7 @@ export class ProcessRaceUseCase {
 
     const standings = await this.getChampionship.execute();
     const allRaces = await this.raceRepository.findByDateRange(
-      ALL_TIME_START,
+      SEASON_START,
       ALL_TIME_END,
     );
     await this.notification.publishChampionshipStandings(

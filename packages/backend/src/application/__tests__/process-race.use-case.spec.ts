@@ -6,6 +6,7 @@ import { CalculatePointsUseCase } from '../calculate-points.use-case';
 import { GetChampionshipStandingsUseCase } from '../get-championship-standings.use-case';
 import { FindConferenceRecordService } from '../find-conference-record.service';
 import { Driver } from '../../core/entities/driver.entity';
+import { SEASON_START } from '../../core/constants';
 import {
   MEET_PROVIDER,
   MeetProviderPort,
@@ -218,6 +219,48 @@ describe('ProcessRaceUseCase', () => {
     expect(raceRepository.save).toHaveBeenCalledTimes(1);
     expect(gridRepository.saveAll).toHaveBeenCalledTimes(1);
     expect(notification.publishRaceResults).toHaveBeenCalledTimes(1);
+  });
+
+  it('pide al repositorio solo las carreras de la temporada en curso', async () => {
+    // La grafica de evolucion se dibuja con estas carreras y la tabla con el
+    // standing. Si aqui se pide "all time" mientras el standing cuenta desde
+    // SEASON_START, el embed dice una carrera y la imagen dibuja la temporada
+    // pasada entera.
+    calendarProvider.getDailyEvent.mockResolvedValue(mockCalendarEvent());
+    meetProvider.getConferenceRecords.mockResolvedValue([
+      mockConferenceRecord(),
+    ]);
+    raceRepository.existsByConferenceRecordName.mockResolvedValue(false);
+    meetProvider.getParticipants.mockResolvedValue(mockParticipants());
+    let counter = 0;
+    driverRepository.upsert.mockImplementation(async (d) => {
+      counter++;
+      return new Driver(`driver-${counter}`, d.googleId, d.displayName, d.email);
+    });
+    raceRepository.save.mockImplementation(
+      async (race) =>
+        new Race(
+          'race-1',
+          race.conferenceRecordName,
+          race.meetingCode,
+          race.greenLight,
+          race.endTime,
+          race.status,
+          race.startingGrid,
+          race.processedAt,
+        ),
+    );
+    gridRepository.saveAll.mockResolvedValue(undefined);
+    raceRepository.findByDateRange.mockResolvedValue([]);
+    notification.publishRaceResults.mockResolvedValue(undefined);
+    notification.publishChampionshipStandings.mockResolvedValue(undefined);
+
+    await useCase.execute();
+
+    expect(raceRepository.findByDateRange).toHaveBeenCalledWith(
+      SEASON_START,
+      expect.any(Date),
+    );
   });
 
   it('should return null when no participants found', async () => {

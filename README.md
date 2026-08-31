@@ -81,6 +81,18 @@ La clasificacion se ordena por puntos totales de mayor a menor, y los empates se
 
 No hay columna de carreras disputadas (GP), y no es un olvido: la fila del embed tiene un presupuesto de 33 celdas y pasarse rompe la linea en los clientes estrechos de Discord. El numero de carreras ya sale en la linea de resumen del mensaje, y ademas es casi el mismo para todo el mundo, asi que era la columna que menos aportaba por celda ocupada.
 
+### Temporadas
+
+El campeonato cuenta desde `SEASON_START` (en `src/core/constants/config.constants.ts`), no desde el principio de los tiempos. La temporada en curso arranca el **1 de septiembre de 2026**, medianoche de Madrid.
+
+Reiniciar el campeonato es mover esa fecha y nada mas. Las carreras anteriores siguen en la base con sus puntos, sus posiciones y sus salidas en falso, pero dejan de sumar en la clasificacion, asi que no hay que borrar nada y el reinicio se puede deshacer. Los pilotos tampoco se tocan: conservan su `google_id` para no duplicarse cuando vuelvan, y quien no haya corrido en la temporada en curso no sale en la tabla hasta que corra.
+
+Mientras la temporada no tiene ninguna carrera, el campeonato no publica nada: la clasificacion esta vacia, el formatter devuelve cero embeds y la grafica devuelve `null`. Desde la primera carrera ya dibuja.
+
+La primera temporada fue del 24 de abril al 26 de agosto de 2026, 89 carreras. Es la que describen las notas de diseno de este README cuando hablan de "la temporada medida".
+
+El CLI de graficas (`make dev-render-charts`) si lee todo el historico a proposito, porque es la unica forma de ver como queda una grafica con una temporada larga detras. Recalcula la clasificacion sobre el subconjunto que dibuja, asi que cada escenario es coherente consigo mismo.
+
 ### Horario del monitor
 
 El sistema monitoriza la reunion de Google Meet:
@@ -98,7 +110,7 @@ Solo detecta reuniones que empezaron dentro de **±30 minutos** de la hora progr
 Dos canales con webhooks independientes:
 
 - **#race-day**: grid de cada carrera con posiciones, puntos, tiempos y Busted
-- **#championship**: clasificacion general acumulada
+- **#championship**: clasificacion general de la temporada en curso
 
 Todo se publica automaticamente al finalizar cada carrera.
 
@@ -116,6 +128,7 @@ El codigo usa terminologia de carreras/F1:
 | Victoria (P1)        | wins              | P1 sin salida en falso          |
 | Peor entrada         | WorstOnGrid       | Busted                          |
 | Ranking acumulado    | Championship      | Clasificacion general           |
+| Temporada            | Season            | Ventana de carreras que puntuan |
 
 ## Prerrequisitos
 
@@ -184,6 +197,8 @@ El backend incluye un **scheduler (cron)** que monitoriza la daily **en tiempo r
 - Los tres pasos del cierre son independientes y se reintentan por separado en los siguientes ticks (hasta 3 intentos). Un fallo puntual de Discord al cerrar la carrera dejaba antes el mensaje del dia congelado en "EN DIRECTO" y el campeonato sin publicar, sin manera de recuperarlo
 
 **Para que funcione en automatico, el backend debe estar corriendo continuamente** (en un servidor, VPS, o similar). En desarrollo local con `make dev`, el scheduler tambien esta activo.
+
+Cuidado con eso: `make dev` dentro de la ventana 8:00-11:59 de un dia laborable monitoriza la daily **real** con el `DAILY_MEETING_CODE` del `.env`, publica su grid en el webhook que tengas configurado y persiste a los participantes reales en tu base local. Si vas a levantar el entorno en esa franja y no quieres que pase, para el servicio `app` (`docker compose stop app`) y deja solo la base, que es lo unico que necesitan los tests.
 
 ## API
 

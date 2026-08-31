@@ -10,7 +10,7 @@ import {
   NOTIFICATION_PORT,
   NotificationPort,
 } from '../core/ports/notification.port';
-import { ALL_TIME_START, ALL_TIME_END } from '../core/constants';
+import { SEASON_START, ALL_TIME_END } from '../core/constants';
 
 async function run() {
   if (process.env.NODE_ENV === 'production') {
@@ -30,7 +30,7 @@ async function run() {
 
     const standings = await getChampionship.execute();
     const allRaces = await raceRepository.findByDateRange(
-      ALL_TIME_START,
+      SEASON_START,
       ALL_TIME_END,
     );
 
