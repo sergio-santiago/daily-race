@@ -8,7 +8,7 @@ import {
   StartingGridRepositoryPort,
 } from '../core/ports/starting-grid.repository.port';
 import { ChampionshipStanding } from '../core/entities/championship-standing.entity';
-import { ALL_TIME_START, ALL_TIME_END } from '../core/constants';
+import { SEASON_START, ALL_TIME_END } from '../core/constants';
 
 @Injectable()
 export class GetChampionshipStandingsUseCase {
@@ -27,7 +27,7 @@ export class GetChampionshipStandingsUseCase {
       const entries =
         await this.startingGridRepository.findByDriverInDateRange(
           driver.id,
-          ALL_TIME_START,
+          SEASON_START,
           ALL_TIME_END,
         );
       if (entries.length === 0) continue;

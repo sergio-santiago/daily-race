@@ -10,6 +10,7 @@ import {
 } from '../../core/ports/starting-grid.repository.port';
 import { Driver } from '../../core/entities/driver.entity';
 import { StartingGridEntry } from '../../core/entities/starting-grid-entry.entity';
+import { SEASON_START } from '../../core/constants';
 
 function makeEntry(
   position: number,
@@ -266,6 +267,42 @@ describe('GetChampionshipStandingsUseCase', () => {
 
       expect(primero.map((s) => s.driver.displayName)).toEqual(['Alba', 'Zoe']);
       expect(segundo.map((s) => s.driver.displayName)).toEqual(['Alba', 'Zoe']);
+    });
+  });
+
+  describe('temporada', () => {
+    it('cuenta solo desde el arranque de la temporada', async () => {
+      // El reinicio del campeonato es este filtro y nada mas: las carreras de la
+      // temporada anterior siguen en la base, pero no las pide nadie. Si alguien
+      // vuelve a pasar una fecha "all time" aqui, la clasificacion resucita el
+      // acumulado viejo y el mensaje de Discord sale con la temporada pasada.
+      const driver = new Driver('d1', 'g1', 'Racer', null);
+      driverRepository.findAll.mockResolvedValue([driver]);
+      gridRepository.findByDriverInDateRange.mockResolvedValue([
+        makeEntry(1, 25),
+      ]);
+
+      await useCase.execute();
+
+      const [, start] = gridRepository.findByDriverInDateRange.mock.calls[0];
+      expect(start).toEqual(SEASON_START);
+    });
+
+    it('deja fuera de la tabla a quien no ha corrido esta temporada', async () => {
+      // Los pilotos de la temporada pasada siguen en drivers, con su googleId,
+      // para no duplicarlos cuando vuelvan. Hasta que corran no son parrilla.
+      const veterano = new Driver('d1', 'g1', 'Veterano', null);
+      const novato = new Driver('d2', 'g2', 'Novato', null);
+
+      driverRepository.findAll.mockResolvedValue([veterano, novato]);
+      gridRepository.findByDriverInDateRange
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([makeEntry(1, 25)]);
+
+      const result = await useCase.execute();
+
+      expect(result.map((s) => s.driver.displayName)).toEqual(['Novato']);
+      expect(result[0].rank).toBe(1);
     });
   });
 

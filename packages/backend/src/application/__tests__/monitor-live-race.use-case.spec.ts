@@ -8,6 +8,7 @@ import { GetChampionshipStandingsUseCase } from '../get-championship-standings.u
 import { FindConferenceRecordService } from '../find-conference-record.service';
 import { Driver } from '../../core/entities/driver.entity';
 import { Race } from '../../core/entities/race.entity';
+import { SEASON_START } from '../../core/constants';
 import {
   MEET_PROVIDER,
   MeetProviderPort,
@@ -344,6 +345,12 @@ describe('MonitorLiveRaceUseCase', () => {
       expect(gridRepository.saveAll).toHaveBeenCalledTimes(1);
       expect(notification.editLiveRaceMessageAsFinal).toHaveBeenCalledTimes(1);
       expect(notification.publishChampionshipStandings).toHaveBeenCalledTimes(1);
+      // Este es el camino que corre cada dia: las carreras que alimentan la
+      // grafica se piden desde el arranque de temporada, igual que el standing
+      expect(raceRepository.findByDateRange).toHaveBeenCalledWith(
+        SEASON_START,
+        expect.any(Date),
+      );
     });
 
     it('should clear state after finalization', async () => {
