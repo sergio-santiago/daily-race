@@ -163,9 +163,9 @@ export class DiscordFormatterService {
   // ── Cambio de temporada ────────────────────────────────────
 
   /**
-   * El relevo entre temporadas. Sale una vez al ano, justo antes de la primera
-   * clasificacion de la temporada nueva, para que nadie se encuentre la tabla a
-   * cero sin explicacion.
+   * El relevo entre temporadas. Sale una vez al ano, la manana del primer dia
+   * que de verdad hay daily, antes de que la mayoria entre a la sala, para que
+   * nadie se encuentre la tabla a cero sin explicacion.
    *
    * Nombra a los tres del podio y no solo al campeon: el segundo y el tercero
    * tambien se han pasado un curso entero madrugando, y la foto de un podio se
@@ -204,7 +204,7 @@ export class DiscordFormatterService {
         `Este es el podio final:\n\n` +
         `${lines.join('\n')}\n\n` +
         `\u{1F6A6}  **Y ahora lo bueno: arranca la ${summary.nextLabel}.**\n` +
-        `El campeón y el último de la tabla vuelven a salir desde la misma casilla.`,
+        `El campeón y el último de la tabla salen hoy desde la misma casilla.`,
       footer: { text: 'Daily Race \u{2014} Secture' },
       timestamp: new Date().toISOString(),
     };

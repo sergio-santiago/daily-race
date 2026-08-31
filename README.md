@@ -91,11 +91,21 @@ Que el historico se guarde no significa que cuente. Despues del reinicio **no qu
 
 #### El relevo
 
-La primera carrera de cada temporada dispara un mensaje en **#championship**, justo antes de la primera clasificacion: cierra la temporada que termina con su podio de tres y anuncia la que empieza. Existe para que nadie se encuentre la tabla a cero sin explicacion.
+La primera manana de cada temporada se publica un mensaje **en los dos canales**, antes de que la mayoria entre a la sala: cierra la temporada que termina con su podio de tres, adjunta la grafica del ano completo y anuncia la que empieza. Existe para que nadie se encuentre la tabla a cero sin explicacion. Va a los dos canales porque hay gente que sigue #race-day y no entra en #championship.
 
-El disparo es `PublishChampionshipUseCase`, y la condicion es que la temporada en curso tenga exactamente una carrera. Es una condicion derivada de los datos, asi que no necesita tabla de estado y sobrevive a un redeploy. Lo unico que anade el caso de uso es un registro en memoria de las temporadas ya anunciadas, para que un reintento del campeonato (el monitor lo intenta hasta tres veces si Discord falla) no republique el relevo.
+El disparo es `AnnounceSeasonUseCase`, y salta **en el primer tick del cron que encuentre evento de daily en el calendario**, o sea a las 8:00 del primer dia con daily de la temporada, con la sala todavia vacia.
 
-No hay relevo si no hay nada que cerrar, o sea en la primerisima temporada.
+La condicion es el evento de calendario y no el tick a secas, y el motivo esta medido. El cron (`*/5 * 8-11 * * 1-5`) garantiza dia laborable de 8:00 a 11:59, pero **no garantiza que ese dia haya daily**: en la primera temporada hubo 89 dias laborables y daily en 88, y el que faltaba era el 1 de mayo, festivo. Consultando el calendario real de ese dia, no habia evento, mientras que un jueves normal si lo tiene y un sabado no. El evento distingue lo que el cron no puede, y en el periodo medido acierta los 89 dias.
+
+Tampoco se dispara al detectar la reunion abierta, que fue la primera idea: la sala nunca se abre mas de 8 minutos antes del semaforo (mediana 0), y `findActiveForEvent` solo mira reuniones que empiezan dentro de ±30 minutos de la hora programada, asi que el mensaje habria salido pegado a la daily y no antes. Ni al arrancar el proceso: el contenedor arranca en cada deploy y a cualquier hora, y el relevo es un evento del calendario, no de la infraestructura.
+
+Queda un riesgo residual asumido: un dia con evento en el calendario al que no vaya nadie (unas vacaciones sin cancelar el evento) publicaria el relevo. En las 89 dailies medidas no ocurrio ni una vez.
+
+La idempotencia la da la tabla `season_announcements`, con un unique en la etiqueta de temporada. El caso de uso reserva el anuncio **antes** de publicarlo, y el orden es deliberado: si publicase primero, un fallo al registrarlo dejaria al cron reintentando cada cinco segundos hasta llenar el canal. Reservando primero, el peor caso es que el mensaje no salga y se publique a mano. Medido con el seed: 200 llamadas seguidas y 20 en paralelo publican una sola vez.
+
+La tabla guarda solo el hecho de que la temporada se anuncio, nunca estadisticas. Las cifras se calculan de las carreras, que no se borran, y duplicarlas seria tener dos versiones de la verdad que se desincronizan en cuanto se corrija una carrera.
+
+Un fallo del anuncio nunca tumba la daily: va en `try/catch` y el monitor sigue con el mensaje en directo. No hay relevo si no hay nada que cerrar, o sea en la primerisima temporada.
 
 #### Notas
 
@@ -196,14 +206,14 @@ El backend incluye un **scheduler (cron)** que monitoriza la daily **en tiempo r
 
 - Se ejecuta **cada 5 segundos, de lunes a viernes, de 8:00 a 11:59** (Europe/Madrid)
 - **Durante la reunion** (meeting activo en Google Meet):
-  1. Detecta el meeting activo y crea un mensaje **en directo** en **#race-day** (Discord)
+  1. Detecta el meeting activo y crea un mensaje **en directo** en **#race-day** (Discord). Si es la primera reunion de una temporada nueva, antes publica el mensaje de relevo en los dos canales
   2. Cada 5 segundos comprueba si hay nuevos participantes
   3. Si alguien nuevo entra, recalcula la parrilla y **edita el mismo mensaje** con el grid actualizado
   4. El mensaje muestra posiciones, puntos y el Busted en tiempo real
 - **Al terminar la reunion** (la sala se vacia):
   1. Persiste los datos en PostgreSQL (drivers, race, starting grid)
   2. Edita el mensaje live al **formato final** (de "EN DIRECTO" a resultado definitivo)
-  3. Publica la clasificacion general actualizada en **#championship** (Discord), precedida del mensaje de relevo si es la primera carrera de la temporada
+  3. Publica la clasificacion general actualizada en **#championship** (Discord)
 - Solo monitoriza reuniones que empezaron cerca de la hora programada del evento (±30 minutos)
 - Si la daily ya fue procesada, no la reprocesa (idempotente)
 - Los tres pasos del cierre son independientes y se reintentan por separado en los siguientes ticks (hasta 3 intentos). Un fallo puntual de Discord al cerrar la carrera dejaba antes el mensaje del dia congelado en "EN DIRECTO" y el campeonato sin publicar, sin manera de recuperarlo
@@ -259,11 +269,12 @@ El cambio entre modos es transparente: el `GoogleModule` inyecta el adaptador co
 
 ### Base de datos
 
-PostgreSQL con 3 tablas:
+PostgreSQL con 4 tablas:
 
 - **drivers**: id, google_id, display_name, email, created_at, updated_at
 - **races**: id, conference_record_name, meeting_code, green_light, end_time, status, processed_at, created_at
 - **starting_grid_entries**: id, race_id, driver_id, position, start_time, green_light, points, is_false_start, is_worst_on_grid
+- **season_announcements**: id, season_label (unique), announced_at. Solo marca que una temporada ya se anuncio, para que el cron no republique el relevo
 
 Las migraciones se ejecutan automaticamente al arrancar la aplicacion (`migrationsRun: true`).
 

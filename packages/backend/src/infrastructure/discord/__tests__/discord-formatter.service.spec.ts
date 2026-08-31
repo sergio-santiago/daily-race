@@ -757,8 +757,36 @@ describe('calavera compartida', () => {
           ),
       );
 
+    // 89 carreras y 83 pilotos, las cifras de la temporada medida. Solo las
+    // longitudes importan aqui: el formatter cuenta, no mira dentro
+    const carreras = (n: number): Race[] =>
+      Array.from({ length: n }, () => makeRace([]));
+
+    const relleno = (total: number, podio: ChampionshipStanding[]) => [
+      ...podio,
+      ...Array.from(
+        { length: Math.max(0, total - podio.length) },
+        (_, i) =>
+          new ChampionshipStanding(
+            new Driver(`x${i}`, `gx${i}`, `Piloto ${i}`, null),
+            10,
+            5,
+            0,
+            20,
+            podio.length + i + 1,
+            0,
+            0,
+          ),
+      ),
+    ];
+
     const resumen = (nombres: string[]): SeasonSummary =>
-      new SeasonSummary('2026-2027', 89, 83, podio(nombres), '2027-2028');
+      new SeasonSummary(
+        '2026-2027',
+        '2027-2028',
+        carreras(89),
+        relleno(83, podio(nombres)),
+      );
 
     it('nombra a los tres del podio, no solo al campeon', () => {
       const embed = formatter.formatSeasonChangeEmbed(
@@ -791,12 +819,12 @@ describe('calavera compartida', () => {
       expect(embed.description).not.toContain('puntuan');
     });
 
-    it('remata con que todos vuelven a salir iguales', () => {
-      // Es la frase que explica el reinicio en terminos del juego, y va en
-      // presente porque el mensaje sale despues de la primera carrera
+    it('remata con que todos salen hoy desde la misma casilla', () => {
+      // Es la frase que explica el reinicio en terminos del juego. Dice "hoy"
+      // porque el mensaje sale por la manana, antes de la carrera
       const embed = formatter.formatSeasonChangeEmbed(resumen(['Ana']));
 
-      expect(embed.description).toContain('misma casilla');
+      expect(embed.description).toContain('salen hoy desde la misma casilla');
       expect(embed.description).not.toContain('mañana');
     });
 
@@ -813,9 +841,9 @@ describe('calavera compartida', () => {
     it('calla el cero de victorias en vez de cantarlo', () => {
       const sinVictorias = new SeasonSummary(
         '2026-2027',
-        89,
-        83,
-        [
+        '2027-2028',
+        carreras(89),
+        relleno(83, [
           new ChampionshipStanding(
             new Driver('d1', 'g1', 'Ana', null),
             500,
@@ -826,8 +854,7 @@ describe('calavera compartida', () => {
             0,
             0,
           ),
-        ],
-        '2027-2028',
+        ]),
       );
 
       const embed = formatter.formatSeasonChangeEmbed(sinVictorias);

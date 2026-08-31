@@ -5,6 +5,7 @@ import { MonitorLiveRaceUseCase } from '../monitor-live-race.use-case';
 import { BuildStartingGridUseCase } from '../build-starting-grid.use-case';
 import { CalculatePointsUseCase } from '../calculate-points.use-case';
 import { PublishChampionshipUseCase } from '../publish-championship.use-case';
+import { AnnounceSeasonUseCase } from '../announce-season.use-case';
 import { FindConferenceRecordService } from '../find-conference-record.service';
 import { Driver } from '../../core/entities/driver.entity';
 import { Race } from '../../core/entities/race.entity';
@@ -64,6 +65,7 @@ describe('MonitorLiveRaceUseCase', () => {
   let gridRepository: jest.Mocked<StartingGridRepositoryPort>;
   let notification: jest.Mocked<NotificationPort>;
   let publishChampionship: { execute: jest.Mock };
+  let announceSeason: { execute: jest.Mock };
   let findConferenceRecord: jest.Mocked<
     Pick<FindConferenceRecordService, 'findActiveForEvent' | 'findForEvent' | 'findByName'>
   >;
@@ -109,6 +111,7 @@ describe('MonitorLiveRaceUseCase', () => {
     };
 
     publishChampionship = { execute: jest.fn().mockResolvedValue(undefined) };
+    announceSeason = { execute: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -118,6 +121,10 @@ describe('MonitorLiveRaceUseCase', () => {
         {
           provide: PublishChampionshipUseCase,
           useValue: publishChampionship,
+        },
+        {
+          provide: AnnounceSeasonUseCase,
+          useValue: announceSeason,
         },
         {
           provide: FindConferenceRecordService,
@@ -247,6 +254,48 @@ describe('MonitorLiveRaceUseCase', () => {
       expect(grid).toHaveLength(3);
       expect(greenLight).toEqual(new Date('2026-03-27T09:30:00.000Z'));
     });
+
+    it('anuncia la temporada en cuanto hay daily programada, con la sala vacia', async () => {
+      // El relevo sale antes de que entre nadie. Basta con que hoy haya evento
+      // de calendario: medido sobre la primera temporada, el unico dia laborable
+      // sin daily fue un festivo y ese dia no habia evento
+      calendarProvider.getDailyEvent.mockResolvedValue(mockCalendarEvent());
+      findConferenceRecord.findActiveForEvent.mockResolvedValue(null);
+
+      await useCase.execute();
+
+      expect(announceSeason.execute).toHaveBeenCalledTimes(1);
+      expect(notification.createLiveRaceMessage).not.toHaveBeenCalled();
+    });
+
+    it('no anuncia nada si hoy no hay daily programada', async () => {
+      // Festivo, fin de semana o daily cancelada: sin evento no hay relevo
+      calendarProvider.getDailyEvent.mockResolvedValue(null);
+
+      await useCase.execute();
+
+      expect(announceSeason.execute).not.toHaveBeenCalled();
+    });
+
+    it('sigue con la daily aunque el anuncio de temporada falle', async () => {
+      // El relevo es cosmetico y la carrera no: si Discord rechaza el anuncio,
+      // el mensaje en directo tiene que salir igual
+      calendarProvider.getDailyEvent.mockResolvedValue(mockCalendarEvent());
+      findConferenceRecord.findActiveForEvent.mockResolvedValue({
+        name: 'conf/1',
+        meetingCode: 'wye-iwfu-jch',
+        startTime: new Date('2026-03-27T09:30:00.000Z'),
+        endTime: null,
+      });
+      meetProvider.getParticipants.mockResolvedValue(mockParticipants(3));
+      announceSeason.execute.mockRejectedValueOnce(new Error('discord down'));
+
+      await useCase.execute();
+
+      expect(notification.createLiveRaceMessage).toHaveBeenCalledTimes(1);
+    });
+
+
   });
 
   describe('live updates', () => {
