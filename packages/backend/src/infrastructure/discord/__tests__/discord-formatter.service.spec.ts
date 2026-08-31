@@ -780,18 +780,60 @@ describe('calavera compartida', () => {
     it('resume la temporada que termina', () => {
       const embed = formatter.formatSeasonChangeEmbed(resumen(['Ana']));
 
-      expect(embed.description).toContain('89');
-      expect(embed.description).toContain('carreras');
-      expect(embed.description).toContain('83');
-      expect(embed.description).toContain('pilotos');
+      expect(embed.description).toContain('**89** dailies');
+      expect(embed.description).toContain('**83** pilotos');
     });
 
-    it('no promete que los resultados viejos sigan puntuando', () => {
-      // El histórico se guarda pero no cuenta para nada que se publique, y el
-      // mensaje no debe dar a entender lo contrario
+    it('no menciona el historico, que no aporta y no puntua', () => {
       const embed = formatter.formatSeasonChangeEmbed(resumen(['Ana']));
 
-      expect(embed.description).toContain('ya no puntuan');
+      expect(embed.description).not.toContain('guardados');
+      expect(embed.description).not.toContain('puntuan');
+    });
+
+    it('remata con que todos vuelven a salir iguales', () => {
+      // Es la frase que explica el reinicio en terminos del juego, y va en
+      // presente porque el mensaje sale despues de la primera carrera
+      const embed = formatter.formatSeasonChangeEmbed(resumen(['Ana']));
+
+      expect(embed.description).toContain('misma casilla');
+      expect(embed.description).not.toContain('mañana');
+    });
+
+    it('da a cada cajon su propia frase', () => {
+      const embed = formatter.formatSeasonChangeEmbed(
+        resumen(['Ana', 'Bruno', 'Carla']),
+      );
+
+      expect(embed.description).toContain('se lleva el título');
+      expect(embed.description).toContain('aguanta el segundo cajón');
+      expect(embed.description).toContain('cierra el podio');
+    });
+
+    it('calla el cero de victorias en vez de cantarlo', () => {
+      const sinVictorias = new SeasonSummary(
+        '2026-2027',
+        89,
+        83,
+        [
+          new ChampionshipStanding(
+            new Driver('d1', 'g1', 'Ana', null),
+            500,
+            82,
+            0,
+            4,
+            1,
+            0,
+            0,
+          ),
+        ],
+        '2027-2028',
+      );
+
+      const embed = formatter.formatSeasonChangeEmbed(sinVictorias);
+
+      expect(embed.description).toContain('500 pts');
+      expect(embed.description).not.toContain('0 victorias');
     });
 
     it('sanea el nombre para que no rompa el mensaje', () => {
