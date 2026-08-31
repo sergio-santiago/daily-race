@@ -9,6 +9,7 @@ import { GetChampionshipStandingsUseCase } from './get-championship-standings.us
 import { FindConferenceRecordService } from './find-conference-record.service';
 import { MonitorLiveRaceUseCase } from './monitor-live-race.use-case';
 import { PublishChampionshipUseCase } from './publish-championship.use-case';
+import { AnnounceSeasonUseCase } from './announce-season.use-case';
 
 @Module({
   imports: [PersistenceModule, GoogleModule, DiscordModule],
@@ -18,6 +19,7 @@ import { PublishChampionshipUseCase } from './publish-championship.use-case';
     ProcessRaceUseCase,
     GetChampionshipStandingsUseCase,
     PublishChampionshipUseCase,
+    AnnounceSeasonUseCase,
     FindConferenceRecordService,
     MonitorLiveRaceUseCase,
   ],

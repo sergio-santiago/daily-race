@@ -27,6 +27,7 @@ import { Race, RaceStatus } from '../core/entities/race.entity';
 import { StartingGridEntry } from '../core/entities/starting-grid-entry.entity';
 import { BuildStartingGridUseCase } from './build-starting-grid.use-case';
 import { PublishChampionshipUseCase } from './publish-championship.use-case';
+import { AnnounceSeasonUseCase } from './announce-season.use-case';
 import { FindConferenceRecordService } from './find-conference-record.service';
 import { ConfigService } from '@nestjs/config';
 import { DAILY_MEETING_CODE } from '../core/constants';
@@ -70,6 +71,7 @@ export class MonitorLiveRaceUseCase {
     private readonly notification: NotificationPort,
     private readonly buildStartingGrid: BuildStartingGridUseCase,
     private readonly publishChampionship: PublishChampionshipUseCase,
+    private readonly announceSeason: AnnounceSeasonUseCase,
     private readonly findConferenceRecord: FindConferenceRecordService,
     config: ConfigService,
   ) {
@@ -89,6 +91,16 @@ export class MonitorLiveRaceUseCase {
       this.meetingCode,
     );
     if (!calendarEvent?.meetingCode) return;
+
+    // Hay daily programada hoy, y la sala todavia puede estar vacia: este es el
+    // momento del relevo de temporada.
+    //
+    // La condicion es el evento de calendario y no el tick del cron, porque el
+    // cron solo sabe que es un dia laborable entre las 8 y las 12. Medido sobre
+    // las 89 dailies de la primera temporada: hubo un unico dia laborable sin
+    // daily (el 1 de mayo, festivo) y ese dia el calendario no tenia evento, asi
+    // que el evento distingue lo que el cron no puede.
+    await this.announceSeasonIfNeeded();
 
     const activeRecord =
       await this.findConferenceRecord.findActiveForEvent(calendarEvent);
@@ -381,6 +393,19 @@ export class MonitorLiveRaceUseCase {
         `Fallo al editar el mensaje final de la carrera ${race.conferenceRecordName}: ${error}`,
       );
       return false;
+    }
+  }
+
+  /**
+   * El relevo de temporada nunca puede tumbar la daily. Si falla, se registra y
+   * el monitor sigue con lo suyo: el peor caso es que el mensaje no salga y se
+   * publique a mano, que es lo que se haria igual.
+   */
+  private async announceSeasonIfNeeded(): Promise<void> {
+    try {
+      await this.announceSeason.execute();
+    } catch (error) {
+      this.logger.error(`Fallo al anunciar la temporada: ${error}`);
     }
   }
 

@@ -85,16 +85,32 @@ export class DiscordWebhookAdapter implements NotificationPort {
   }
 
   /**
-   * Va al canal del campeonato y sin grafica: el relevo de temporada se lee de
-   * un vistazo, y la imagen que viene detras es la de la temporada nueva.
+   * Va a los dos canales, no solo al del campeonato: hay gente que sigue
+   * #race-day y no entra en #championship, y el relevo tiene que verlo todo el
+   * mundo antes de encontrarse la tabla a cero.
+   *
+   * Lleva adjunta la grafica de la temporada que se cierra, que es el ano
+   * completo dibujado y el mejor resumen posible de lo que ha pasado.
    */
   async publishSeasonChange(summary: SeasonSummary): Promise<void> {
     const embed = this.formatter.formatSeasonChangeEmbed(summary);
-    await this.sendWebhook(
-      { username: 'Daily Race', embeds: [embed] },
-      this.championshipWebhook,
+    const chart = this.tryRenderChampionshipChart(
+      summary.standings,
+      summary.races,
     );
-    await this.sleep(EMBED_SEND_DELAY_MS);
+    this.attachChartToLastEmbed([embed], chart);
+
+    // Si un canal falla, el otro ya no se intenta y el anuncio queda a medias.
+    // Es aceptable: el registro ya esta puesto, asi que no habra reintento en
+    // bucle, y un relevo a medio publicar se remata a mano.
+    for (const webhook of [this.championshipWebhook, this.raceDayWebhook]) {
+      await this.sendWebhook(
+        { username: 'Daily Race', embeds: [embed] },
+        webhook,
+        chart,
+      );
+      await this.sleep(EMBED_SEND_DELAY_MS);
+    }
   }
 
   async createLiveRaceMessage(
