@@ -22,7 +22,9 @@ async function run() {
 
   try {
     // Se publica por el mismo caso de uso que produccion, para que el preview
-    // incluya el mensaje de cambio de temporada cuando toque
+    // sea la clasificacion de verdad y no una version aparte. El relevo de
+    // temporada NO sale por aqui: vive en AnnounceSeasonUseCase, que lo dispara
+    // el monitor al abrir la jornada
     const publishChampionship = app.get(PublishChampionshipUseCase);
     const getChampionship = app.get(GetChampionshipStandingsUseCase);
     const raceRepository = app.get<RaceRepositoryPort>(RACE_REPOSITORY);
